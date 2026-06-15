@@ -1,0 +1,80 @@
+name: deploy-hetzner
+
+# Production deploy of the web edge to the Hetzner server (https://onebonus.am).
+# Mirrors OneBonusBackend's deploy convention: runs on a push to any branch whose
+# commit message contains the word "Deploy" (e.g. "Deploy web"). A GitHub-hosted
+# runner rsyncs the source to the server over SSH (dedicated CI key) and rebuilds
+# the web container, which serves the React build and reverse-proxies every other
+# request to the backend app over the shared `onebonus-net` docker network.
+#
+# Required repository secret:
+#   HETZNER_DEPLOY_KEY  — the dedicated CI deploy private key, BASE64-ENCODED on a
+#                         single line (decoded in the Set up SSH step). Same key as
+#                         OneBonusBackend; its public half is in the server's
+#                         authorized_keys.
+#
+# Server prerequisite (one-time): /root/OneBonusWeb/.env exists with DOMAIN and
+# ACME_EMAIL set (cp .env.example .env). The shared network is created here if
+# missing.
+
+on:
+  push:
+    branches:
+      - '**'
+
+# Never run two web deploys at once; let a new one wait rather than clobber.
+concurrency:
+  group: deploy-hetzner-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: contains(github.event.head_commit.message, 'Deploy')
+    runs-on: ubuntu-latest
+    env:
+      SERVER_HOST: 178.104.31.157
+      SERVER_USER: root
+      REMOTE_DIR: /root/OneBonusWeb
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH (dedicated deploy key + pinned host key)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_DEPLOY_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Rsync source to server (.env and build caches preserved)
+        run: |
+          rsync -az --human-readable \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes" \
+            --exclude='.git' --exclude='node_modules' --exclude='dist' \
+            --exclude='.env' --exclude='*.log' \
+            ./ "$SERVER_USER@$SERVER_HOST:$REMOTE_DIR/"
+
+      - name: Build & restart web edge
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" \
+            'set -e
+             cd '"$REMOTE_DIR"'
+             if [ ! -f .env ]; then
+               echo "ERROR: '"$REMOTE_DIR"'/.env missing — cp .env.example .env and set DOMAIN/ACME_EMAIL"
+               exit 1
+             fi
+             docker network create onebonus-net 2>/dev/null || true
+             DOCKER_BUILDKIT=1 docker compose up -d --build'
+
+      - name: Verify the edge responds
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" \
+            'cd '"$REMOTE_DIR"'
+             for i in $(seq 1 30); do
+               curl -fsS -o /dev/null http://localhost/ && exit 0
+               sleep 4
+             done
+             echo "web edge health check failed"
+             docker compose logs --tail 50 web
+             exit 1'

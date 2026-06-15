@@ -56,7 +56,21 @@ docker network create onebonus-net
    curl -I https://onebonus.am/swagger-ui/index.html   # proxied to app
    ```
 
-## Updating the site later
+## CI/CD (GitHub Actions)
+
+Same convention as OneBonusBackend:
+
+- **`ci.yml`** — on every push to `main`/`master` and on PRs: `npm ci` → `npm run build` → `npm run lint`.
+- **`deploy-hetzner.yml`** — on a push to any branch whose **commit message contains `Deploy`** (e.g. `git commit -m "Deploy web"`): rsyncs the source to the server over SSH, creates `onebonus-net` if missing, runs `docker compose up -d --build`, and health-checks the edge on `http://localhost/`.
+
+One-time setup so the pipeline works (mirrors the backend's):
+
+1. **Repo secret** — add `HETZNER_DEPLOY_KEY` to the `verev_web` repo (Settings → Secrets and variables → Actions). Use the **same** base64-encoded CI deploy private key already configured on `verev_backend`; its public half is already in the server's `authorized_keys`.
+2. **Server `.env`** — one time on the box: `cd /root/OneBonusWeb && cp .env.example .env` and set `DOMAIN` / `ACME_EMAIL`. The deploy preserves it (rsync excludes `.env`).
+
+After that, shipping the site is a normal push with `Deploy` in the message.
+
+## Updating the site manually
 
 ```bash
 cd OneBonusWeb && git pull && docker compose up -d --build
