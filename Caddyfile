@@ -1,22 +1,40 @@
+# Reverse-proxy to the backend app. Defined once, reused by every proxy handler.
+(backend) {
+	reverse_proxy {$BACKEND_UPSTREAM} {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+		header_up Host {host}
+	}
+}
+
 {$DOMAIN} {
 	encode zstd gzip
 	tls {$ACME_EMAIL}
 
+	# Static: the landing and its assets. The Google Wallet logo is /assets/logo.png
+	# (GOOGLE_WALLET_LOGO_URI) and must stay publicly reachable here.
 	handle /assets/* {
 		root * /srv/site
 		file_server
 	}
-
 	handle / {
 		root * /srv/site
 		file_server
 	}
 
+	# Public wallet + versioned API contract: card links (/wallet/c/*), the Google
+	# callback (/wallet/google/callback) and the whole /v1 API. Proxied explicitly so
+	# a more-specific match always wins — a future static/SPA fallback cannot swallow
+	# them and break the links, the callback, or Google's review.
+	handle /wallet/* {
+		import backend
+	}
+	handle /v1/* {
+		import backend
+	}
+
+	# Everything else (swagger, actuator, /v3/api-docs, WebSocket/STOMP) -> backend.
 	handle {
-		reverse_proxy {$BACKEND_UPSTREAM} {
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Forwarded-For {remote_host}
-			header_up Host {host}
-		}
+		import backend
 	}
 }
