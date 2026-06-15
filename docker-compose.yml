@@ -1,0 +1,26 @@
+services:
+  web:
+    build: .
+    image: onebonus-web:latest
+    container_name: onebonus-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-app:8080}
+    networks:
+      - onebonus-net
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+networks:
+  onebonus-net:
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
