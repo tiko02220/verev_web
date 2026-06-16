@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { Environment, Lightformer, useGLTF } from '@react-three/drei'
 import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing'
 import * as THREE from 'three'
@@ -115,7 +115,7 @@ function makeTexture(card: Card, ob: boolean): THREE.CanvasTexture {
     x.beginPath()
     for (let px = 0; px <= W; px += 8) {
       const py = H * 0.16 + k * 56 + Math.sin(px / 95 + k * 0.6) * 24 + Math.sin(px / 240) * 34
-      px === 0 ? x.moveTo(px, py) : x.lineTo(px, py)
+      if (px === 0) x.moveTo(px, py); else x.lineTo(px, py)
     }
     x.stroke()
   }
@@ -223,9 +223,9 @@ function CardMesh({ tex, idx, prog, ob }: { tex: THREE.CanvasTexture; idx: numbe
 }
 
 function CameraRig({ prog }: { prog: { current: number } }) {
-  const camera = useThree((s) => s.camera)
-  const size = useThree((s) => s.size)
-  useFrame(() => {
+  useFrame((state) => {
+    const camera = state.camera
+    const size = state.size
     const p = prog.current
     const aspect = size.width / size.height
     const zBase = aspect < 0.85 ? 15 : aspect < 1.3 ? 13 : 11.5
