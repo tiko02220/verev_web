@@ -4,6 +4,8 @@ import type {
   AppUpdateConfig,
   AuditEntry,
   CreateAdminRequest,
+  ModerationCardDesign,
+  ModerationPromotion,
   PlatformAdminUser,
   PlatformDashboard,
   UpsertAppUpdateRequest,
@@ -27,6 +29,42 @@ export function useAuditLog(page: number) {
         limit: AUDIT_PAGE_SIZE,
         offset: page * AUDIT_PAGE_SIZE,
       }),
+  })
+}
+
+export function usePendingPromotions() {
+  return useQuery({
+    queryKey: ['moderation-promotions'],
+    queryFn: () => api.get<ModerationPromotion[]>('/v1/admin/moderation/promotions'),
+  })
+}
+
+export function useDecidePromotion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ campaignId, approve, reason }: { campaignId: string; approve: boolean; reason?: string }) =>
+      approve
+        ? api.post<Record<string, string>>('/v1/admin/moderation/promotions/approve', {}, { campaignId })
+        : api.post<Record<string, string>>('/v1/admin/moderation/promotions/reject', { reason }, { campaignId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-promotions'] }),
+  })
+}
+
+export function usePendingCardDesigns() {
+  return useQuery({
+    queryKey: ['moderation-card-designs'],
+    queryFn: () => api.get<ModerationCardDesign[]>('/v1/admin/moderation/card-designs'),
+  })
+}
+
+export function useDecideCardDesign() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ storeId, approve, reason }: { storeId: string; approve: boolean; reason?: string }) =>
+      approve
+        ? api.post<Record<string, string>>('/v1/admin/moderation/card-designs/approve', {}, { storeId })
+        : api.post<Record<string, string>>('/v1/admin/moderation/card-designs/reject', { reason }, { storeId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-card-designs'] }),
   })
 }
 

@@ -167,6 +167,41 @@ export interface PlatformDashboard {
   pointsOutstanding: number
 }
 
+export interface ModerationPromotion {
+  campaignId: string
+  organizationId: string
+  merchantName: string
+  storeName: string
+  name: string
+  description: string
+  imageUri: string
+  promotionType: string
+  promotionValue: number
+  startDate: string
+  endDate: string
+  minimumPurchaseAmount: number
+  usageLimit: number
+  visibility: string
+  audienceAll: boolean
+  audienceGender: string
+  audienceAgeMin: number | null
+  audienceAgeMax: number | null
+  audienceTierName: string
+  createdAt: string
+}
+
+export interface ModerationCardDesign {
+  storeId: string
+  organizationId: string
+  merchantName: string
+  cardName: string
+  logoUrl: string
+  cardBackgroundUrl: string
+  primaryColor: string
+  secondaryColor: string
+  updatedAt: string
+}
+
 export interface AppUpdateConfig {
   platform: string
   latestVersionName: string
