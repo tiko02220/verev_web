@@ -2,19 +2,53 @@
 
 .admin-root {
   font-family: 'Fira Sans', system-ui, -apple-system, sans-serif;
-  color: #0f172a;
+  color: #0b1220;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
-  background: var(--color-canvas);
+  background:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(22, 163, 74, 0.05), transparent 60%),
+    var(--color-canvas);
 }
 
 .admin-root .mono {
   font-family: 'Fira Code', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .admin-root ::selection {
   background: #bbf7d0;
+}
+
+.admin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d2d6dd transparent;
+}
+.admin-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.admin-scroll::-webkit-scrollbar-thumb {
+  background: #d2d6dd;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 9999px;
+}
+
+@keyframes admin-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-rise {
+  animation: admin-rise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

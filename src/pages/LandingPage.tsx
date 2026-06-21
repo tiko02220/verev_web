@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import '../styles/landing.css'
 import OneBonusCard from './landing/OneBonusCard'
 import MergeScene from './landing/MergeScene'
 import AddCustomerScene from './landing/AddCustomerScene'

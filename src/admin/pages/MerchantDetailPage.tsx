@@ -47,7 +47,7 @@ export function MerchantDetailPage() {
 
   if (merchantQuery.isError) {
     return (
-      <div className="p-6">
+      <div className="p-6 sm:p-8">
         <BackLink />
         <ErrorState
           message={merchantQuery.error instanceof Error ? merchantQuery.error.message : 'Failed to load merchant'}
@@ -61,14 +61,14 @@ export function MerchantDetailPage() {
 
   return (
     <>
-      <header className="border-b border-slate-200 bg-white px-6 pt-5">
+      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-canvas/85 px-6 pt-5 backdrop-blur-md sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <BackLink />
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {merchant ? (
                 <>
-                  <h1 className="text-xl font-semibold text-slate-900">{merchant.displayName}</h1>
+                  <h1 className="text-xl font-semibold tracking-tight text-ink">{merchant.displayName}</h1>
                   <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
                   <StatusPill tone={accessStateTone(merchant.accessState)}>{humanize(merchant.accessState)}</StatusPill>
                 </>
@@ -81,13 +81,13 @@ export function MerchantDetailPage() {
           {merchant ? <LifecycleActions merchantId={merchantId} accessState={merchant.accessState as OrganizationAccessState} /> : null}
         </div>
 
-        <nav className="mt-4 flex gap-1" aria-label="Merchant sections">
+        <nav className="admin-scroll mt-4 flex gap-1 overflow-x-auto" aria-label="Merchant sections">
           {TABS.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => setSearchParams({ tab: item.key })}
-              className={`cursor-pointer border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              className={`-mb-px shrink-0 cursor-pointer border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
                 tab === item.key ? 'border-brand text-brand-dark' : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -97,7 +97,7 @@ export function MerchantDetailPage() {
         </nav>
       </header>
 
-      <div className="p-6">
+      <div className="admin-rise p-6 sm:p-8">
         {tab === 'stores' ? (
           <StoresTab merchantId={merchantId} />
         ) : tab === 'staff' ? (

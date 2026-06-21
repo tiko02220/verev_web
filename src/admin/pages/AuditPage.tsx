@@ -35,7 +35,7 @@ export function AuditPage() {
   return (
     <>
       <PageHeader title="Audit log" subtitle="Every recorded platform action, newest first" />
-      <div className="space-y-4 p-6">
+      <div className="admin-rise space-y-4 p-6 sm:p-8">
         {isLoading ? (
           <Skeleton className="h-64 w-full" />
         ) : isError ? (

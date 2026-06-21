@@ -1,70 +1,158 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Ban, Coins, Receipt, Store, Tag, UsersRound } from 'lucide-react'
+import { ArrowRight, Ban, Clock, Coins, Receipt, Store, UsersRound } from 'lucide-react'
 import { useDashboard } from '../api/platform'
-import { useAdminAuth } from '../auth/AdminAuthContext'
-import { formatNumber } from '../lib/format'
-import { Card, ErrorState, MetricCard, PageHeader, Skeleton } from '../components/ui/primitives'
+import { useMerchants } from '../api/merchants'
+import { formatNumber, humanize, orgStatusTone } from '../lib/format'
+import { Button, Card, ErrorState, MetricCard, PageHeader, Skeleton, StatusPill } from '../components/ui/primitives'
+import type { PlatformDashboard } from '../types/api'
 
 export function DashboardPage() {
-  const { admin } = useAdminAuth()
-  const firstName = admin?.fullName.split(' ')[0] ?? 'there'
   const { data, isLoading, isError, error, refetch } = useDashboard()
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle={`Welcome back, ${firstName}.`} />
-      <div className="space-y-6 p-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Platform health at a glance"
+        actions={
+          <Link to="/admin/merchants">
+            <Button variant="secondary" icon={<Store className="size-4" aria-hidden />}>
+              View merchants
+            </Button>
+          </Link>
+        }
+      />
+      <div className="admin-rise space-y-6 p-6 sm:p-8">
         {isError ? (
           <ErrorState message={error instanceof Error ? error.message : 'Failed to load dashboard'} onRetry={() => refetch()} />
         ) : (
-          <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            {isLoading || !data ? (
-              Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-24" />)
-            ) : (
-              <>
-                <MetricCard label="Merchants" value={formatNumber(data.totalMerchants)} icon={<Store className="size-4" aria-hidden />} />
-                <MetricCard label="Active" value={formatNumber(data.activeMerchants)} icon={<Store className="size-4" aria-hidden />} hint="merchants" />
-                <MetricCard label="Suspended" value={formatNumber(data.suspendedMerchants)} icon={<Ban className="size-4" aria-hidden />} hint="merchants" />
-                <MetricCard label="Pending" value={formatNumber(data.pendingMerchants)} icon={<Store className="size-4" aria-hidden />} hint="merchants" />
-                <MetricCard label="Customers" value={formatNumber(data.totalCustomers)} icon={<UsersRound className="size-4" aria-hidden />} />
-                <MetricCard label="Stores" value={formatNumber(data.totalStores)} icon={<Store className="size-4" aria-hidden />} />
-                <MetricCard label="Transactions" value={formatNumber(data.totalTransactions)} icon={<Receipt className="size-4" aria-hidden />} />
-                <MetricCard label="Points out" value={formatNumber(data.pointsOutstanding)} icon={<Coins className="size-4" aria-hidden />} hint="liability" />
-              </>
-            )}
-          </section>
-        )}
+          <>
+            <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Metric loading={isLoading} label="Merchants" value={data?.totalMerchants} tone="info" icon={<Store className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Active" value={data?.activeMerchants} tone="success" icon={<Store className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Suspended" value={data?.suspendedMerchants} tone="danger" icon={<Ban className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Pending" value={data?.pendingMerchants} tone="warning" icon={<Clock className="size-4" aria-hidden />} />
+            </section>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <QuickLink to="/admin/merchants" icon={<Store className="size-5" aria-hidden />} title="Merchants" subtitle="View and manage every organization" />
-          <QuickLink to="/admin/audit" icon={<Tag className="size-5" aria-hidden />} title="Audit log" subtitle="Every platform action, newest first" />
-        </div>
+            <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Metric loading={isLoading} label="Customers" value={data?.totalCustomers} icon={<UsersRound className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Stores" value={data?.totalStores} icon={<Store className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Transactions" value={data?.totalTransactions} icon={<Receipt className="size-4" aria-hidden />} />
+              <Metric loading={isLoading} label="Points outstanding" value={data?.pointsOutstanding} hint="open liability" icon={<Coins className="size-4" aria-hidden />} />
+            </section>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <StatusBreakdown data={data} loading={isLoading} />
+              <RecentMerchants />
+            </div>
+          </>
+        )}
       </div>
     </>
   )
 }
 
-interface QuickLinkProps {
-  to: string
-  icon: ReactNode
-  title: string
-  subtitle: string
+interface MetricProps {
+  loading: boolean
+  label: string
+  value: number | undefined
+  tone?: 'success' | 'danger' | 'warning' | 'neutral' | 'info'
+  hint?: string
+  icon?: ReactNode
 }
 
-function QuickLink({ to, icon, title, subtitle }: QuickLinkProps) {
-  return (
-    <Link to={to} className="block">
-      <Card className="p-5 transition-shadow hover:shadow-md">
-        <div className="flex items-center gap-4">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-brand-soft text-brand-dark">{icon}</span>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-slate-900">{title}</p>
-            <p className="text-sm text-slate-500">{subtitle}</p>
-          </div>
-          <ArrowRight className="size-5 text-slate-400" aria-hidden />
-        </div>
+function Metric({ loading, label, value, tone = 'neutral', hint, icon }: MetricProps) {
+  if (loading || value === undefined) return <Skeleton className="h-[104px]" />
+  return <MetricCard label={label} value={formatNumber(value)} tone={tone} hint={hint} icon={icon} />
+}
+
+const STATUS_SEGMENTS: ReadonlyArray<{ key: keyof PlatformDashboard; label: string; color: string }> = [
+  { key: 'activeMerchants', label: 'Active', color: 'bg-emerald-500' },
+  { key: 'pendingMerchants', label: 'Pending', color: 'bg-amber-500' },
+  { key: 'suspendedMerchants', label: 'Suspended', color: 'bg-red-500' },
+]
+
+function StatusBreakdown({ data, loading }: { data: PlatformDashboard | undefined; loading: boolean }) {
+  if (loading || !data) {
+    return (
+      <Card className="p-5">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-5 h-3 w-full" />
+        <Skeleton className="mt-5 h-24 w-full" />
       </Card>
-    </Link>
+    )
+  }
+  const cancelled = Math.max(0, data.totalMerchants - data.activeMerchants - data.pendingMerchants - data.suspendedMerchants)
+  const segments = [...STATUS_SEGMENTS, { key: 'totalMerchants' as const, label: 'Cancelled', color: 'bg-slate-300', value: cancelled }]
+  const total = Math.max(1, data.totalMerchants)
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm font-semibold text-ink">Merchants by status</h2>
+      <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+        {segments.map((segment) => {
+          const value = 'value' in segment ? segment.value : data[segment.key]
+          const pct = (value / total) * 100
+          return pct > 0 ? <div key={segment.label} className={segment.color} style={{ width: `${pct}%` }} aria-hidden /> : null
+        })}
+      </div>
+      <ul className="mt-5 space-y-2.5">
+        {segments.map((segment) => {
+          const value = 'value' in segment ? segment.value : data[segment.key]
+          return (
+            <li key={segment.label} className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 text-slate-600">
+                <span className={`size-2.5 rounded-full ${segment.color}`} aria-hidden />
+                {segment.label}
+              </span>
+              <span className="mono font-medium text-ink">{formatNumber(value)}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+function RecentMerchants() {
+  const { data, isLoading } = useMerchants({})
+  const rows = (data ?? []).slice(0, 6)
+
+  return (
+    <Card className="xl:col-span-2">
+      <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+        <h2 className="text-sm font-semibold text-ink">Recent merchants</h2>
+        <Link to="/admin/merchants" className="inline-flex items-center gap-1 text-xs font-medium text-brand-dark hover:underline">
+          View all <ArrowRight className="size-3.5" aria-hidden />
+        </Link>
+      </div>
+      {isLoading ? (
+        <div className="space-y-3 p-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="px-5 py-10 text-center text-sm text-subtle">No merchants yet.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {rows.map((merchant) => (
+            <li key={merchant.organizationId}>
+              <Link to={`/admin/merchants/${merchant.organizationId}`} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-slate-50/70">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{merchant.displayName}</p>
+                  <p className="mono truncate text-xs text-slate-400">{merchant.slug}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="mono hidden text-xs text-slate-500 sm:block">{formatNumber(merchant.customerCount)} customers</span>
+                  <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 export interface SimpleColumn<T> {
   header: string
+  align?: 'left' | 'right'
   render: (row: T) => ReactNode
 }
 
@@ -13,12 +14,12 @@ interface SimpleTableProps<T> {
 
 export function SimpleTable<T>({ rows, columns, getKey }: SimpleTableProps<T>) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="admin-scroll overflow-x-auto rounded-card border border-slate-200/70 bg-white shadow-card">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <tr className="border-b border-slate-200/70 bg-slate-50/60 text-xs font-semibold uppercase tracking-wider text-slate-500">
             {columns.map((column) => (
-              <th key={column.header} className="px-4 py-3">
+              <th key={column.header} className={`px-5 py-3 font-semibold ${column.align === 'right' ? 'text-right' : 'text-left'}`}>
                 {column.header}
               </th>
             ))}
@@ -26,9 +27,9 @@ export function SimpleTable<T>({ rows, columns, getKey }: SimpleTableProps<T>) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={getKey(row)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+            <tr key={getKey(row)} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
               {columns.map((column) => (
-                <td key={column.header} className="px-4 py-3">
+                <td key={column.header} className={`px-5 py-3.5 align-middle ${column.align === 'right' ? 'text-right' : 'text-left'}`}>
                   {column.render(row)}
                 </td>
               ))}

@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { LayoutDashboard, LogOut, ScrollText, Store } from 'lucide-react'
 import { useAdminAuth } from '../auth/AdminAuthContext'
-import { Button } from './ui/primitives'
 
 interface NavItem {
   to: string
@@ -30,46 +29,61 @@ export function AdminShell() {
   const { admin, logout } = useAdminAuth()
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">1B</span>
-          <span className="text-sm font-semibold text-slate-900">One Bonus Admin</span>
+    <div className="flex h-screen overflow-hidden">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white md:flex">
+        <div className="flex h-16 items-center gap-2.5 px-5">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-sm font-bold text-white shadow-sm">1B</span>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold text-ink">One Bonus</p>
+            <p className="text-xs text-subtle">Admin console</p>
+          </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Main navigation">
+
+        <nav className="flex flex-1 flex-col gap-1 px-3 py-2" aria-label="Main navigation">
+          <p className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">Platform</p>
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-soft text-brand-dark' : 'text-slate-600 hover:bg-slate-100'
+                `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                  isActive ? 'bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`
               }
             >
-              <item.icon className="size-5" aria-hidden />
-              {item.label}
+              {({ isActive }) => (
+                <>
+                  <item.icon className={`size-[18px] ${isActive ? 'text-brand' : 'text-slate-400 group-hover:text-slate-600'}`} aria-hidden />
+                  {item.label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-slate-200 p-3">
-          <div className="flex items-center gap-3 px-2 py-1.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+
+        <div className="border-t border-slate-200/70 p-3">
+          <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+            <span className="flex size-9 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-dark ring-1 ring-inset ring-brand-ring/60">
               {admin ? initials(admin.fullName) : ''}
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{admin?.fullName}</p>
-              <p className="truncate text-xs text-slate-500">{admin?.role.replace('_', ' ').toLowerCase()}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink">{admin?.fullName}</p>
+              <p className="truncate text-xs capitalize text-subtle">{admin?.role.replace('_', ' ').toLowerCase()}</p>
             </div>
+            <button
+              type="button"
+              onClick={logout}
+              aria-label="Sign out"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
+              <LogOut className="size-4" aria-hidden />
+            </button>
           </div>
-          <Button variant="ghost" icon={<LogOut className="size-4" aria-hidden />} onClick={logout} className="mt-1 w-full justify-start">
-            Sign out
-          </Button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-x-hidden">
+      <main className="admin-scroll min-w-0 flex-1 overflow-y-auto">
         <Outlet />
       </main>
     </div>

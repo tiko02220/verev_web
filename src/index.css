@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #15803d;
-  --color-brand-dark: #166534;
-  --color-brand-soft: #f0fdf4;
-  --color-canvas: #f6f8fa;
+  --color-brand: #16a34a;
+  --color-brand-dark: #15803d;
+  --color-brand-soft: #ecfdf3;
+  --color-brand-ring: #abefc6;
+  --color-canvas: #f6f7f9;
+  --color-ink: #0b1220;
+  --color-subtle: #667085;
+
+  --radius-card: 16px;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 12px 32px -12px rgba(16, 24, 40, 0.25);
 }
