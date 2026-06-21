@@ -26,6 +26,14 @@
 		file_server
 	}
 
+	# Admin console SPA — client-side routed under /admin/*. Serve the app shell for any
+	# /admin path so deep links (e.g. /admin/login) don't fall through to the backend.
+	handle /admin* {
+		root * /srv/site
+		try_files {path} /index.html
+		file_server
+	}
+
 	# Public wallet + versioned API contract: card links (/wallet/c/*), the Google
 	# callback (/wallet/google/callback) and the whole /v1 API. Proxied explicitly so
 	# a more-specific match always wins — a future static/SPA fallback cannot swallow
