@@ -1,19 +1,39 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, LogOut, ScrollText, Store } from 'lucide-react'
+import { LayoutDashboard, LogOut, ScrollText, ShieldCheck, Smartphone, Store } from 'lucide-react'
 import { useAdminAuth } from '../auth/AdminAuthContext'
+import { can } from '../auth/permissions'
+import type { Capability } from '../auth/permissions'
 
 interface NavItem {
   to: string
   label: string
   icon: LucideIcon
   end?: boolean
+  capability?: Capability
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/merchants', label: 'Merchants', icon: Store },
-  { to: '/admin/audit', label: 'Audit log', icon: ScrollText },
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Platform',
+    items: [
+      { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/admin/merchants', label: 'Merchants', icon: Store },
+      { to: '/admin/audit', label: 'Audit log', icon: ScrollText },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { to: '/admin/app-updates', label: 'App updates', icon: Smartphone, capability: 'merchants.config' },
+      { to: '/admin/admins', label: 'Administrators', icon: ShieldCheck, capability: 'admins.manage' },
+    ],
+  },
 ]
 
 function initials(fullName: string): string {
@@ -39,27 +59,35 @@ export function AdminShell() {
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 px-3 py-2" aria-label="Main navigation">
-          <p className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">Platform</p>
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon className={`size-[18px] ${isActive ? 'text-brand' : 'text-slate-400 group-hover:text-slate-600'}`} aria-hidden />
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
+        <nav className="admin-scroll flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-2" aria-label="Main navigation">
+          {NAV_GROUPS.map((group) => {
+            const visible = group.items.filter((item) => !item.capability || (admin ? can(admin.role, item.capability) : false))
+            if (visible.length === 0) return null
+            return (
+              <div key={group.label} className="mb-1">
+                <p className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">{group.label}</p>
+                {visible.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                        isActive ? 'bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon className={`size-[18px] ${isActive ? 'text-brand' : 'text-slate-400 group-hover:text-slate-600'}`} aria-hidden />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </nav>
 
         <div className="border-t border-slate-200/70 p-3">

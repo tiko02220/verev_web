@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { BookOpen, CreditCard, Megaphone, Receipt, Tag } from 'lucide-react'
+import { BookOpen, CreditCard, Megaphone, Receipt, ShieldCheck, Tag } from 'lucide-react'
 import {
   ledgerPageSize,
+  useMerchantApprovals,
   useMerchantBilling,
   useMerchantCampaigns,
   useMerchantLedger,
@@ -14,7 +15,7 @@ import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill 
 import type { PillTone } from '../../components/ui/primitives'
 import { SimpleTable } from '../../components/ui/SimpleTable'
 import type { SimpleColumn } from '../../components/ui/SimpleTable'
-import type { AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction, BillingInvoice } from '../../types/api'
+import type { AdminApproval, AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction, BillingInvoice } from '../../types/api'
 
 function activeTone(active: boolean): PillTone {
   return active ? 'success' : 'neutral'
@@ -152,6 +153,40 @@ export function LedgerTab({ merchantId }: { merchantId: string }) {
     <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<BookOpen className="size-7" aria-hidden />} emptyTitle="No ledger entries" onRetry={() => refetch()}>
       <div className="space-y-4">
         <SimpleTable<AdminLedgerEntry> rows={rows} getKey={(entry) => entry.id} columns={columns} />
+        <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
+      </div>
+    </TabGate>
+  )
+}
+
+function approvalTone(status: string): PillTone {
+  switch (status) {
+    case 'APPROVED':
+      return 'success'
+    case 'PENDING':
+      return 'warning'
+    case 'REJECTED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+export function ApprovalsTab({ merchantId }: { merchantId: string }) {
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, error, refetch, isFetching } = useMerchantApprovals(merchantId, page)
+  const rows = data ?? []
+  const columns: SimpleColumn<AdminApproval>[] = [
+    { header: 'Requested', render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
+    { header: 'Type', render: (row) => <span className="text-slate-700">{humanize(row.requestType)}</span> },
+    { header: 'Reason', render: (row) => <span className="text-slate-500">{row.reasonText || '—'}</span> },
+    { header: 'Expires', render: (row) => <span className="text-slate-500">{row.expiresAt ? formatDate(row.expiresAt) : '—'}</span> },
+    { header: 'Status', render: (row) => <StatusPill tone={approvalTone(row.status)}>{humanize(row.status)}</StatusPill> },
+  ]
+  return (
+    <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<ShieldCheck className="size-7" aria-hidden />} emptyTitle="No approval requests" onRetry={() => refetch()}>
+      <div className="space-y-4">
+        <SimpleTable<AdminApproval> rows={rows} getKey={(row) => row.id} columns={columns} />
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
     </TabGate>

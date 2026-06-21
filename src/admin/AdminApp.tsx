@@ -10,6 +10,8 @@ import { DashboardPage } from './pages/DashboardPage'
 import { MerchantsPage } from './pages/MerchantsPage'
 import { MerchantDetailPage } from './pages/MerchantDetailPage'
 import { AuditPage } from './pages/AuditPage'
+import { AppUpdatesPage } from './pages/AppUpdatesPage'
+import { AdminsPage } from './pages/AdminsPage'
 
 export default function AdminApp() {
   return (
@@ -29,6 +31,8 @@ export default function AdminApp() {
               <Route path="merchants" element={<MerchantsPage />} />
               <Route path="merchants/:merchantId" element={<MerchantDetailPage />} />
               <Route path="audit" element={<AuditPage />} />
+              <Route path="app-updates" element={<AppUpdatesPage />} />
+              <Route path="admins" element={<AdminsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>

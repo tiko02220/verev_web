@@ -23,7 +23,7 @@ import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill,
 import { ConfirmDialog, Modal } from '../components/ui/Dialog'
 import { SimpleTable } from '../components/ui/SimpleTable'
 import type { SimpleColumn } from '../components/ui/SimpleTable'
-import { ProgramsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab } from './merchant/MerchantDataTabs'
+import { ProgramsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
 import { ApiError } from '../lib/apiClient'
 import { STAFF_ROLES } from '../types/api'
 import type { AdminCustomer, AdminStaff, AdminStore, DeletionMode, MerchantDetail, OrganizationAccessState, UpdateStoreRequest } from '../types/api'
@@ -37,6 +37,7 @@ const TABS = [
   { key: 'campaigns', label: 'Campaigns' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'ledger', label: 'Ledger' },
+  { key: 'approvals', label: 'Approvals' },
   { key: 'billing', label: 'Billing' },
 ] as const
 
@@ -113,6 +114,8 @@ export function MerchantDetailPage() {
           <TransactionsTab merchantId={merchantId} />
         ) : tab === 'ledger' ? (
           <LedgerTab merchantId={merchantId} />
+        ) : tab === 'approvals' ? (
+          <ApprovalsTab merchantId={merchantId} />
         ) : tab === 'billing' ? (
           <BillingTab merchantId={merchantId} />
         ) : (

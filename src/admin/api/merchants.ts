@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/apiClient'
 import type {
+  AdminApproval,
   AdminCampaign,
   AdminCustomer,
   AdminLedgerEntry,
@@ -100,6 +101,18 @@ export function useMerchantTransactions(organizationId: string, page: number) {
     queryKey: ['merchant-transactions', organizationId, page],
     queryFn: () =>
       api.get<AdminTransaction[]>('/v1/admin/organizations/transactions', {
+        organizationId,
+        limit: LEDGER_PAGE_SIZE,
+        offset: page * LEDGER_PAGE_SIZE,
+      }),
+  })
+}
+
+export function useMerchantApprovals(organizationId: string, page: number) {
+  return useQuery({
+    queryKey: ['merchant-approvals', organizationId, page],
+    queryFn: () =>
+      api.get<AdminApproval[]>('/v1/admin/organizations/approvals', {
         organizationId,
         limit: LEDGER_PAGE_SIZE,
         offset: page * LEDGER_PAGE_SIZE,

@@ -167,6 +167,51 @@ export interface PlatformDashboard {
   pointsOutstanding: number
 }
 
+export interface AppUpdateConfig {
+  platform: string
+  latestVersionName: string
+  latestVersionCode: number
+  minimumVersionCode: number
+  storeUrl: string
+  updatedAt: string
+}
+
+export interface UpsertAppUpdateRequest {
+  latestVersionName: string
+  latestVersionCode: number
+  minimumVersionCode: number
+  storeUrl: string
+}
+
+export const PLATFORM_ADMIN_ROLES = ['OWNER', 'OPERATIONS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN'] as const
+export type PlatformAdminRoleName = (typeof PLATFORM_ADMIN_ROLES)[number]
+
+export interface PlatformAdminUser {
+  id: string
+  email: string
+  fullName: string
+  role: string
+  status: string
+  lastLoginAt: string | null
+  createdAt: string
+}
+
+export interface CreateAdminRequest {
+  email: string
+  fullName: string
+  role: string
+  password: string
+}
+
+export interface AdminApproval {
+  id: string
+  requestType: string
+  status: string
+  reasonText: string
+  createdAt: string
+  expiresAt: string | null
+}
+
 export interface AuditEntry {
   id: string
   actorType: string
