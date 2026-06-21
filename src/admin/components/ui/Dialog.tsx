@@ -69,13 +69,15 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [reason, setReason] = useState('')
   const [typed, setTyped] = useState('')
+  const [wasOpen, setWasOpen] = useState(open)
 
-  useEffect(() => {
+  if (wasOpen !== open) {
+    setWasOpen(open)
     if (!open) {
       setReason('')
       setTyped('')
     }
-  }, [open])
+  }
 
   const phraseMatches = !confirmPhrase || typed.trim() === confirmPhrase
 
