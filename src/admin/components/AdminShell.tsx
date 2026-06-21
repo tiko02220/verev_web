@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { ClipboardCheck, LayoutDashboard, LogOut, ScrollText, ShieldCheck, Smartphone, Store } from 'lucide-react'
+import { Bell, ClipboardCheck, LayoutDashboard, LogOut, ScrollText, ShieldCheck, Smartphone, Store } from 'lucide-react'
 import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import type { Capability } from '../auth/permissions'
@@ -31,6 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Settings',
     items: [
+      { to: '/admin/notifications', label: 'Notifications', icon: Bell, capability: 'merchants.config' },
       { to: '/admin/app-updates', label: 'App updates', icon: Smartphone, capability: 'merchants.config' },
       { to: '/admin/admins', label: 'Administrators', icon: ShieldCheck, capability: 'admins.manage' },
     ],

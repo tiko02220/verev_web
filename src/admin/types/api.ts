@@ -167,6 +167,13 @@ export interface PlatformDashboard {
   pointsOutstanding: number
 }
 
+export interface NotificationSettings {
+  notificationEmail: string
+  telegramChatId: string
+  emailEnabled: boolean
+  telegramEnabled: boolean
+}
+
 export interface ModerationPromotion {
   campaignId: string
   organizationId: string

@@ -13,6 +13,7 @@ import { AuditPage } from './pages/AuditPage'
 import { AppUpdatesPage } from './pages/AppUpdatesPage'
 import { AdminsPage } from './pages/AdminsPage'
 import { ModerationPage } from './pages/ModerationPage'
+import { NotificationsPage } from './pages/NotificationsPage'
 
 export default function AdminApp() {
   return (
@@ -34,6 +35,7 @@ export default function AdminApp() {
               <Route path="audit" element={<AuditPage />} />
               <Route path="moderation" element={<ModerationPage />} />
               <Route path="app-updates" element={<AppUpdatesPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="admins" element={<AdminsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/admin" replace />} />

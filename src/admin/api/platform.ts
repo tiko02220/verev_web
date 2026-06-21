@@ -6,6 +6,7 @@ import type {
   CreateAdminRequest,
   ModerationCardDesign,
   ModerationPromotion,
+  NotificationSettings,
   PlatformAdminUser,
   PlatformDashboard,
   UpsertAppUpdateRequest,
@@ -65,6 +66,21 @@ export function useDecideCardDesign() {
         ? api.post<Record<string, string>>('/v1/admin/moderation/card-designs/approve', {}, { storeId })
         : api.post<Record<string, string>>('/v1/admin/moderation/card-designs/reject', { reason }, { storeId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-card-designs'] }),
+  })
+}
+
+export function useNotificationSettings() {
+  return useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: () => api.get<NotificationSettings>('/v1/admin/notification-settings'),
+  })
+}
+
+export function useUpdateNotificationSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: NotificationSettings) => api.put<NotificationSettings>('/v1/admin/notification-settings', request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notification-settings'] }),
   })
 }
 
