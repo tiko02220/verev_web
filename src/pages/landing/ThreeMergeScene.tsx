@@ -48,14 +48,6 @@ const LEV = [
   { ax: 0.16, ay: 0.23, sx: 0.46, sy: 0.54, ph: 2.2 },
   { ax: 0.21, ay: 0.17, sx: 0.5, sy: 0.42, ph: 5.4 },
 ]
-const ZRANK: number[] = (() => {
-  const cx = 0, cy = 2.5, cz = 12
-  const camDist2 = (i: number) => (POSE[i].x - cx) ** 2 + (POSE[i].y - cy) ** 2 + (POSE[i].z - cz) ** 2
-  const order = POSE.map((_, i) => i).sort((a, b) => camDist2(b) - camDist2(a))
-  const rank: number[] = []
-  order.forEach((idx, r) => { rank[idx] = r })
-  return rank
-})()
 
 function roundRect(x: CanvasRenderingContext2D, rx: number, ry: number, w: number, h: number, r: number) {
   x.beginPath()
@@ -183,7 +175,7 @@ function CardMesh({ tex, idx, prog, ob }: { tex: THREE.CanvasTexture; idx: numbe
     if (!grp.current) return
     const p = prog.current
     const tm = state.clock.elapsedTime
-    const TILT_X = 8 * D, TILT_Y = -5 * D
+    const TILT_X = 16 * D
     if (ob) {
       const flip = clamp01((p - 0.7) / 0.06)
       const fly = easeInOut(clamp01((p - 0.85) / 0.13))
@@ -194,22 +186,33 @@ function CardMesh({ tex, idx, prog, ob }: { tex: THREE.CanvasTexture; idx: numbe
       applyOpacity(mat.current, clamp01((flip - 0.45) / 0.1))
       return
     }
-    const e = easeOut(clamp01((p - eStart) / 0.1))
-    const ga = easeInOut(clamp01((p - 0.32) / 0.12))
-    const gb = easeInOut(clamp01((p - 0.46) / 0.18))
+    const e = easeOut(clamp01((p - eStart) / 0.12))
+    const gStart = 0.4 + idx * 0.012
+    const gp = easeInOut(clamp01((p - gStart) / 0.18))
+    const gr = easeInOut(clamp01((p - 0.28) / 0.1))
+    const gc = easeInOut(clamp01((p - 0.62) / 0.1))
     const flip = clamp01((p - 0.7) / 0.06)
-    const lev = (1 - ga) * e
+    const dr = idx === 1 ? 2 : idx === 2 ? 1 : idx
+    const o = dr - 2.5
+    const lev = (1 - gp) * e
     const lx = Math.sin(tm * l.sx + l.ph) * l.ax * lev
     const ly = Math.cos(tm * l.sy + l.ph) * l.ay * lev
-    const zLane = ZRANK[idx] * 0.1
+    const towerX = o * 0.06
+    const towerY = -o * 0.42 + 0.15
+    const towerZ = -o * 0.3
+    const chaosZ = 2.4 - dr * 0.95
     grp.current.position.set(
-      lerp(c.x, 0, gb) + lx,
-      lerp(c.y - 0.9, -0.2, gb) + (1 - e) * -0.7 + ly,
-      lerp(c.z, zLane, ga),
+      lerp(lerp(c.x * 1.35, towerX, gp) + lx, 0, gc),
+      lerp(lerp(c.y * 1.3, towerY, gp) + (1 - e) * -0.6 + ly, -0.2, gc),
+      lerp(lerp(chaosZ, towerZ, gp), -dr * 0.09, gc),
     )
-    grp.current.rotation.set(lerp(c.rx * D, TILT_X, ga), lerp(c.ry * D, TILT_Y, ga) + flip * Math.PI, lerp(c.rz * D, 0, ga))
+    grp.current.rotation.set(
+      lerp(lerp(c.rx * 0.5 * D, 22 * D, gr), TILT_X, gc),
+      lerp(c.ry * 0.5 * D, -5 * D, gr) + flip * Math.PI,
+      lerp(c.rz * 0.5 * D, 0, gr),
+    )
     grp.current.scale.setScalar(lerp(0.6, 1, e) * (1 - 0.12 * Math.sin(flip * Math.PI)))
-    const op = clamp01((p - eStart) / 0.1) * (1 - clamp01((flip - 0.45) / 0.1))
+    const op = clamp01((p - eStart) / 0.12) * (1 - clamp01((flip - 0.45) / 0.1))
     applyOpacity(mat.current, op)
   })
 

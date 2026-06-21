@@ -4,4 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    port: process.env.PORT ? Number(process.env.PORT) : 5173,
+    proxy: {
+      '/v1': {
+        target: process.env.VITE_BACKEND_PROXY ?? 'https://onebonus.am',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })

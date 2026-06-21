@@ -80,7 +80,6 @@ export default function LandingPage() {
       <header className="hero">
         <div className="hero-mesh" />
         <div className="wrap hero-inner">
-          <div className="eyebrow">The loyalty network</div>
           <h1 className="title-hero">One card.<br /><span className="grad-text">Every merchant.</span></h1>
           <p className="intro">The loyalty card your customers actually carry — one identity for every business on the network.</p>
           <div className="hero-cta">
@@ -90,7 +89,6 @@ export default function LandingPage() {
           <div className="hero-trust">
             <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="13" rx="3" /></svg>Google &amp; Apple Wallet</span>
             <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 8a9 9 0 0 1 0 8M9.5 5.5a13 13 0 0 1 0 13" /></svg>NFC &amp; barcode</span>
-            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 6 9 17l-5-5" /></svg>No customer app</span>
           </div>
         </div>
         <div className="hero-stage" ref={stageRef}>
@@ -130,7 +128,6 @@ export default function LandingPage() {
           <div className="stats reveal">
             <div className="stat"><div className="stat-n">1</div><div className="stat-c">Universal card across the whole network</div></div>
             <div className="stat"><div className="stat-n">2<span className="u">s</span></div><div className="stat-c">Tap-and-go NFC checkout</div></div>
-            <div className="stat"><div className="stat-n">4</div><div className="stat-c">Ways to carry it</div></div>
             <div className="stat"><div className="stat-n">0</div><div className="stat-c">Apps for customers to install</div></div>
           </div>
         </div>
