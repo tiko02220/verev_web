@@ -9,9 +9,11 @@ import {
   useMerchantOverview,
   useMerchantStaff,
   useMerchantStores,
+  useSetCustomerBlocked,
   useSetStaffActive,
   useSetStoreActive,
   useUpdateAccessState,
+  useUpdateMerchantProfile,
   useUpdateStaffRole,
   useUpdateStore,
 } from '../api/merchants'
@@ -19,14 +21,14 @@ import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import { useDebounce } from '../lib/useDebounce'
 import { accessStateTone, formatDate, formatNumber, humanize, orgStatusTone } from '../lib/format'
-import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, TextField } from '../components/ui/primitives'
+import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, Switch, TextField } from '../components/ui/primitives'
 import { ConfirmDialog, Modal } from '../components/ui/Dialog'
 import { SimpleTable } from '../components/ui/SimpleTable'
 import type { SimpleColumn } from '../components/ui/SimpleTable'
 import { ProgramsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
 import { ApiError } from '../lib/apiClient'
 import { STAFF_ROLES } from '../types/api'
-import type { AdminCustomer, AdminStaff, AdminStore, DeletionMode, MerchantDetail, OrganizationAccessState, UpdateStoreRequest } from '../types/api'
+import type { AdminCustomer, AdminStaff, AdminStore, DeletionMode, MerchantDetail, OrganizationAccessState, UpdateProfileRequest, UpdateStoreRequest } from '../types/api'
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -135,91 +137,66 @@ function BackLink() {
   )
 }
 
-interface LifecycleAction {
-  label: string
-  accessState: OrganizationAccessState
-  tone: 'primary' | 'danger'
-}
-
-function actionsFor(accessState: OrganizationAccessState): LifecycleAction[] {
-  switch (accessState) {
-    case 'ACTIVE':
-      return [
-        { label: 'Set read-only', accessState: 'READ_ONLY_GRACE', tone: 'primary' },
-        { label: 'Suspend', accessState: 'SUSPENDED', tone: 'danger' },
-        { label: 'Cancel', accessState: 'CANCELLED', tone: 'danger' },
-      ]
-    case 'READ_ONLY_GRACE':
-      return [
-        { label: 'Reactivate', accessState: 'ACTIVE', tone: 'primary' },
-        { label: 'Suspend', accessState: 'SUSPENDED', tone: 'danger' },
-        { label: 'Cancel', accessState: 'CANCELLED', tone: 'danger' },
-      ]
-    case 'SUSPENDED':
-      return [
-        { label: 'Reactivate', accessState: 'ACTIVE', tone: 'primary' },
-        { label: 'Cancel', accessState: 'CANCELLED', tone: 'danger' },
-      ]
-    case 'CANCELLED':
-      return [{ label: 'Reactivate', accessState: 'ACTIVE', tone: 'primary' }]
-    default:
-      return []
-  }
-}
-
 function LifecycleActions({ merchantId, accessState }: { merchantId: string; accessState: OrganizationAccessState }) {
   const { admin } = useAdminAuth()
   const mutation = useUpdateAccessState(merchantId)
-  const [pending, setPending] = useState<LifecycleAction | null>(null)
+  const [confirmingDisable, setConfirmingDisable] = useState(false)
   const [errorText, setErrorText] = useState<string | null>(null)
 
   if (!admin || !can(admin.role, 'merchants.suspend')) return null
 
-  function confirm(reason: string) {
-    if (!pending) return
+  const isEnabled = accessState === 'ACTIVE'
+
+  function apply(state: OrganizationAccessState, reason?: string) {
     setErrorText(null)
     mutation.mutate(
-      { accessState: pending.accessState, reasonText: reason || undefined },
+      { accessState: state, reasonText: reason || undefined },
       {
-        onSuccess: () => setPending(null),
+        onSuccess: () => setConfirmingDisable(false),
         onError: (error) => setErrorText(error instanceof ApiError ? error.message : 'Action failed'),
       },
     )
   }
 
+  function onToggle(next: boolean) {
+    setErrorText(null)
+    if (next) apply('ACTIVE')
+    else setConfirmingDisable(true)
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {actionsFor(accessState).map((action) => (
-        <Button
-          key={action.accessState}
-          variant={action.tone === 'danger' ? 'secondary' : 'primary'}
-          className={action.tone === 'danger' ? 'text-red-600' : ''}
-          onClick={() => {
-            setErrorText(null)
-            setPending(action)
-          }}
-        >
-          {action.label}
+    <div className="flex flex-wrap items-center gap-3">
+      <div
+        className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 ${
+          isEnabled ? 'border-emerald-200 bg-emerald-50/60' : 'border-red-200 bg-red-50/60'
+        }`}
+      >
+        <Switch checked={isEnabled} onChange={onToggle} disabled={mutation.isPending} label="Merchant enabled" />
+        <span className={`text-sm font-medium ${isEnabled ? 'text-emerald-700' : 'text-red-700'}`}>{isEnabled ? 'Enabled' : 'Disabled'}</span>
+      </div>
+      {accessState !== 'CANCELLED' ? (
+        <Button variant="secondary" className="text-red-600" onClick={() => apply('CANCELLED')}>
+          Cancel account
         </Button>
-      ))}
+      ) : null}
       <ConfirmDialog
-        open={pending !== null}
-        title={`${pending?.label ?? ''} merchant`}
+        open={confirmingDisable}
+        title="Disable merchant"
         description={
           <div className="flex flex-col gap-2">
             <span>
-              Set access to <span className="font-semibold text-slate-900">{pending ? humanize(pending.accessState) : ''}</span>? This takes effect
-              immediately.
+              Disabling locks out the owner and <span className="font-semibold text-slate-900">all staff</span> — none of them can log in or perform any
+              action until you re-enable. Takes effect immediately.
             </span>
             {errorText ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</span> : null}
           </div>
         }
-        confirmLabel={pending?.label ?? 'Confirm'}
-        tone={pending?.tone}
+        confirmLabel="Disable merchant"
+        tone="danger"
         withReason
         isLoading={mutation.isPending}
-        onConfirm={confirm}
-        onClose={() => setPending(null)}
+        onConfirm={(reason) => apply('SUSPENDED', reason)}
+        onClose={() => setConfirmingDisable(false)}
       />
     </div>
   )
@@ -261,7 +238,7 @@ function OverviewTab({ merchantId, merchant }: { merchantId: string; merchant: M
         />
       ) : null}
 
-      <ProfileCard merchant={merchant} />
+      <ProfileCard merchantId={merchantId} merchant={merchant} />
       {merchant ? <DangerZone merchant={merchant} /> : null}
     </div>
   )
@@ -347,10 +324,20 @@ const PROFILE_FIELDS: ReadonlyArray<{ label: string; key: keyof MerchantDetail }
   { label: 'Plan', key: 'planCode' },
 ]
 
-function ProfileCard({ merchant }: { merchant: MerchantDetail | undefined }) {
+function ProfileCard({ merchantId, merchant }: { merchantId: string; merchant: MerchantDetail | undefined }) {
+  const { admin } = useAdminAuth()
+  const canManage = admin ? can(admin.role, 'merchants.config') : false
+  const [editing, setEditing] = useState(false)
   return (
     <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold text-slate-900">Profile</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900">Profile</h2>
+        {canManage && merchant ? (
+          <Button variant="secondary" icon={<Pencil className="size-4" aria-hidden />} className="h-8 px-2.5" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        ) : null}
+      </div>
       <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
         {PROFILE_FIELDS.map((field) => (
           <div key={field.key} className="flex flex-col gap-0.5">
@@ -359,7 +346,80 @@ function ProfileCard({ merchant }: { merchant: MerchantDetail | undefined }) {
           </div>
         ))}
       </dl>
+      {merchant ? <ProfileEditDialog merchantId={merchantId} merchant={merchant} open={editing} onClose={() => setEditing(false)} /> : null}
     </Card>
+  )
+}
+
+function toProfileForm(merchant: MerchantDetail): UpdateProfileRequest {
+  return {
+    legalName: merchant.legalName,
+    displayName: merchant.displayName,
+    industry: merchant.industry,
+    email: merchant.email,
+    phone: merchant.phone,
+    defaultCurrencyCode: merchant.defaultCurrencyCode,
+    defaultTimezone: merchant.defaultTimezone,
+  }
+}
+
+const PROFILE_EDIT_FIELDS: ReadonlyArray<{ label: string; key: keyof UpdateProfileRequest }> = [
+  { label: 'Legal name', key: 'legalName' },
+  { label: 'Display name', key: 'displayName' },
+  { label: 'Industry', key: 'industry' },
+  { label: 'Email', key: 'email' },
+  { label: 'Phone', key: 'phone' },
+  { label: 'Currency', key: 'defaultCurrencyCode' },
+  { label: 'Timezone', key: 'defaultTimezone' },
+]
+
+function ProfileEditDialog({ merchantId, merchant, open, onClose }: { merchantId: string; merchant: MerchantDetail; open: boolean; onClose: () => void }) {
+  const mutation = useUpdateMerchantProfile(merchantId)
+  const [form, setForm] = useState<UpdateProfileRequest>(() => toProfileForm(merchant))
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
+
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) {
+      setForm(toProfileForm(merchant))
+      setErrorText(null)
+    }
+  }
+
+  function save() {
+    setErrorText(null)
+    mutation.mutate(form, { onSuccess: onClose, onError: (error) => setErrorText(error instanceof ApiError ? error.message : 'Update failed') })
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Edit merchant profile"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <Button isLoading={mutation.isPending} disabled={!form.legalName.trim() || !form.displayName.trim()} onClick={save}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {PROFILE_EDIT_FIELDS.map((field) => (
+          <TextField
+            key={field.key}
+            label={field.label}
+            value={form[field.key]}
+            onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
+          />
+        ))}
+        {errorText ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
+      </div>
+    </Modal>
   )
 }
 
@@ -594,8 +654,46 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
     setPage(0)
   }
 
+  const { admin } = useAdminAuth()
+  const canManage = admin ? can(admin.role, 'merchants.config') : false
+  const setBlocked = useSetCustomerBlocked(merchantId)
   const rows = data ?? []
   const hasNextPage = rows.length === customersPageSize
+
+  const columns: SimpleColumn<AdminCustomer>[] = [
+    {
+      header: 'Customer',
+      render: (customer) => (
+        <div>
+          <span className="font-medium text-slate-900">{`${customer.firstName} ${customer.lastName}`.trim() || '—'}</span>
+          <span className="mono block text-xs text-slate-400">{customer.loyaltyId}</span>
+        </div>
+      ),
+    },
+    { header: 'Phone', render: (customer) => <span className="mono text-slate-600">{customer.phoneNumber}</span> },
+    { header: 'Tier', render: (customer) => <span className="text-slate-600">{customer.loyaltyTier}</span> },
+    { header: 'Points', align: 'right', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.currentPoints)}</span> },
+    { header: 'Visits', align: 'right', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.totalVisits)}</span> },
+    { header: 'Last visit', render: (customer) => <span className="text-slate-500">{customer.lastVisitAt ? formatDate(customer.lastVisitAt) : '—'}</span> },
+    { header: 'Status', render: (customer) => <StatusPill tone={customerStatusTone(customer.status)}>{humanize(customer.status)}</StatusPill> },
+  ]
+  if (canManage) {
+    columns.push({
+      header: 'Actions',
+      align: 'right',
+      render: (customer) => (
+        <Button
+          variant="ghost"
+          icon={<Power className="size-4" aria-hidden />}
+          isLoading={setBlocked.isPending && setBlocked.variables?.customerId === customer.customerId}
+          onClick={() => setBlocked.mutate({ customerId: customer.customerId, blocked: customer.status !== 'BLOCKED' })}
+          className={`h-8 px-2 ${customer.status === 'BLOCKED' ? 'text-brand-dark' : 'text-red-600'}`}
+        >
+          {customer.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+        </Button>
+      ),
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -619,27 +717,7 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
         <StateBlock icon={<UsersRound className="size-7" aria-hidden />} title="No customers" subtitle={search ? 'Try a different search.' : undefined} />
       ) : (
         <>
-          <SimpleTable<AdminCustomer>
-            rows={rows}
-            getKey={(customer) => customer.customerId}
-            columns={[
-              {
-                header: 'Customer',
-                render: (customer) => (
-                  <div>
-                    <span className="font-medium text-slate-900">{`${customer.firstName} ${customer.lastName}`.trim() || '—'}</span>
-                    <span className="mono block text-xs text-slate-400">{customer.loyaltyId}</span>
-                  </div>
-                ),
-              },
-              { header: 'Phone', render: (customer) => <span className="mono text-slate-600">{customer.phoneNumber}</span> },
-              { header: 'Tier', render: (customer) => <span className="text-slate-600">{customer.loyaltyTier}</span> },
-              { header: 'Points', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.currentPoints)}</span> },
-              { header: 'Visits', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.totalVisits)}</span> },
-              { header: 'Last visit', render: (customer) => <span className="text-slate-500">{customer.lastVisitAt ? formatDate(customer.lastVisitAt) : '—'}</span> },
-              { header: 'Status', render: (customer) => <StatusPill tone={customerStatusTone(customer.status)}>{humanize(customer.status)}</StatusPill> },
-            ]}
-          />
+          <SimpleTable<AdminCustomer> rows={rows} getKey={(customer) => customer.customerId} columns={columns} />
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">{isFetching ? 'Loading…' : `Page ${page + 1}`}</span>
             <div className="flex gap-2">

@@ -15,6 +15,7 @@ import type {
   MerchantOverview,
   MerchantSummary,
   UpdateAccessStateRequest,
+  UpdateProfileRequest,
   UpdateStoreRequest,
 } from '../types/api'
 
@@ -148,6 +149,26 @@ export function useUpdateAccessState(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: ['merchant', organizationId] })
       queryClient.invalidateQueries({ queryKey: ['merchants'] })
     },
+  })
+}
+
+export function useUpdateMerchantProfile(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: UpdateProfileRequest) => api.put<MerchantDetail>('/v1/admin/organizations/profile', request, { organizationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['merchant', organizationId] })
+      queryClient.invalidateQueries({ queryKey: ['merchants'] })
+    },
+  })
+}
+
+export function useSetCustomerBlocked(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ customerId, blocked }: { customerId: string; blocked: boolean }) =>
+      api.post<Record<string, string>>(`/v1/admin/organizations/customer/${blocked ? 'block' : 'unblock'}`, undefined, { organizationId, customerId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-customers', organizationId] }),
   })
 }
 

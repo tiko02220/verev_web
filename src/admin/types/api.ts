@@ -238,6 +238,16 @@ export interface UpdateAccessStateRequest {
   reasonText?: string
 }
 
+export interface UpdateProfileRequest {
+  legalName: string
+  displayName: string
+  industry: string
+  email: string
+  phone: string
+  defaultCurrencyCode: string
+  defaultTimezone: string
+}
+
 export type DeletionMode = 'ANONYMIZE' | 'RAW_PURGE'
 
 export interface DeleteMerchantRequest {
