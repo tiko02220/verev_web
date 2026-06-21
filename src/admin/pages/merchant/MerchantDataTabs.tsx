@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { BookOpen, Megaphone, Receipt, Tag } from 'lucide-react'
+import { BookOpen, CreditCard, Megaphone, Receipt, Tag } from 'lucide-react'
 import {
   ledgerPageSize,
+  useMerchantBilling,
   useMerchantCampaigns,
   useMerchantLedger,
   useMerchantPrograms,
   useMerchantTransactions,
 } from '../../api/merchants'
-import { formatDate, formatNumber, humanize } from '../../lib/format'
-import { Button, ErrorState, Skeleton, StateBlock, StatusPill } from '../../components/ui/primitives'
+import { formatDate, formatMoney, formatNumber, humanize } from '../../lib/format'
+import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill } from '../../components/ui/primitives'
 import type { PillTone } from '../../components/ui/primitives'
 import { SimpleTable } from '../../components/ui/SimpleTable'
 import type { SimpleColumn } from '../../components/ui/SimpleTable'
-import type { AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction } from '../../types/api'
+import type { AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction, BillingInvoice } from '../../types/api'
 
 function activeTone(active: boolean): PillTone {
   return active ? 'success' : 'neutral'
@@ -154,5 +155,95 @@ export function LedgerTab({ merchantId }: { merchantId: string }) {
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
     </TabGate>
+  )
+}
+
+function subscriptionTone(status: string): PillTone {
+  switch (status) {
+    case 'ACTIVE':
+      return 'success'
+    case 'TRIAL':
+      return 'info'
+    case 'PAST_DUE':
+    case 'GRACE':
+      return 'warning'
+    case 'SUSPENDED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+function invoiceTone(status: string): PillTone {
+  switch (status) {
+    case 'PAID':
+      return 'success'
+    case 'OPEN':
+      return 'warning'
+    case 'PAST_DUE':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+export function BillingTab({ merchantId }: { merchantId: string }) {
+  const { data, isLoading, isError, error, refetch } = useMerchantBilling(merchantId)
+  if (isLoading) return <Skeleton className="h-64 w-full" />
+  if (isError) return <ErrorState message={error instanceof Error ? error.message : 'Failed to load billing'} onRetry={() => refetch()} />
+  if (!data) return <StateBlock icon={<CreditCard className="size-7" aria-hidden />} title="No billing data" />
+
+  const subscription = data.currentSubscription
+  const currency = subscription?.currencyCode ?? ''
+  const invoiceColumns: SimpleColumn<BillingInvoice>[] = [
+    { header: 'Invoice', render: (invoice) => <span className="font-medium text-ink">{invoice.title}</span> },
+    { header: 'Period', render: (invoice) => <span className="text-slate-600">{invoice.periodLabel}</span> },
+    { header: 'Issued', render: (invoice) => <span className="text-slate-500">{formatDate(invoice.issuedDate)}</span> },
+    { header: 'Amount', align: 'right', render: (invoice) => <span className="mono text-slate-700">{formatMoney(invoice.amount, invoice.currencyCode)}</span> },
+    { header: 'Status', render: (invoice) => <StatusPill tone={invoiceTone(invoice.status)}>{humanize(invoice.status)}</StatusPill> },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <MetricCard label="Open invoices" value={formatNumber(data.summary.openInvoiceCount)} hint={formatMoney(data.summary.openInvoiceAmount, currency)} />
+        <MetricCard label="Paid (30 days)" value={formatMoney(data.summary.paidInvoiceAmount30d, currency)} />
+        <MetricCard label="Monthly price" value={data.summary.currentMonthlyPrice !== null ? formatMoney(data.summary.currentMonthlyPrice, currency) : '—'} hint={data.summary.nextRenewalDate ? `renews ${formatDate(data.summary.nextRenewalDate)}` : undefined} />
+      </section>
+
+      <Card className="p-5">
+        <h2 className="mb-4 text-sm font-semibold text-ink">Subscription</h2>
+        {subscription ? (
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+            <Field label="Plan" value={subscription.displayName || subscription.planCode} />
+            <Field label="Status" value={<StatusPill tone={subscriptionTone(subscription.status)}>{humanize(subscription.status)}</StatusPill>} />
+            <Field label="Monthly price" value={formatMoney(subscription.monthlyPrice, subscription.currencyCode)} />
+            <Field label="Billing cycle" value={humanize(subscription.billingCycle)} />
+            <Field label="Auto-renew" value={subscription.autoRenew ? 'On' : 'Off'} />
+            <Field label="Renewal date" value={formatDate(subscription.renewalDate)} />
+          </dl>
+        ) : (
+          <p className="text-sm text-subtle">No active subscription.</p>
+        )}
+      </Card>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-ink">Invoices</h2>
+        {data.invoices.length === 0 ? (
+          <StateBlock icon={<Receipt className="size-7" aria-hidden />} title="No invoices" />
+        ) : (
+          <SimpleTable<BillingInvoice> rows={data.invoices} getKey={(invoice) => invoice.id} columns={invoiceColumns} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
+      <dd className="text-sm text-slate-800">{value}</dd>
+    </div>
   )
 }

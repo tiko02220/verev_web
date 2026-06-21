@@ -9,6 +9,7 @@ import type {
   AdminStore,
   AdminTransaction,
   DeleteMerchantRequest,
+  MerchantBilling,
   MerchantDetail,
   MerchantOverview,
   MerchantSummary,
@@ -103,6 +104,13 @@ export function useMerchantTransactions(organizationId: string, page: number) {
         limit: LEDGER_PAGE_SIZE,
         offset: page * LEDGER_PAGE_SIZE,
       }),
+  })
+}
+
+export function useMerchantBilling(organizationId: string) {
+  return useQuery({
+    queryKey: ['merchant-billing', organizationId],
+    queryFn: () => api.get<MerchantBilling>('/v1/admin/organizations/billing', { organizationId }),
   })
 }
 

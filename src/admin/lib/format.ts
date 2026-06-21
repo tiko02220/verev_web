@@ -12,6 +12,10 @@ export function formatNumber(value: number): string {
   return NUMBER_FORMATTER.format(value)
 }
 
+export function formatMoney(value: number, currencyCode: string): string {
+  return `${NUMBER_FORMATTER.format(value)} ${currencyCode}`.trim()
+}
+
 export function humanize(token: string): string {
   return token
     .toLowerCase()

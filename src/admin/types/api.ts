@@ -117,6 +117,44 @@ export interface AdminLedgerEntry {
   createdAt: string
 }
 
+export interface BillingSubscription {
+  planCode: string
+  displayName: string
+  monthlyPrice: number
+  currencyCode: string
+  billingCycle: string
+  status: string
+  autoRenew: boolean
+  renewalDate: string
+  active: boolean
+}
+
+export interface BillingInvoice {
+  id: string
+  title: string
+  periodLabel: string
+  amount: number
+  currencyCode: string
+  status: string
+  issuedDate: string
+}
+
+export interface BillingSummary {
+  openInvoiceCount: number
+  openInvoiceAmount: number
+  paidInvoiceAmount30d: number
+  currentMonthlyPrice: number | null
+  nextRenewalDate: string | null
+}
+
+export interface MerchantBilling {
+  organizationId: string
+  accessState: string
+  currentSubscription: BillingSubscription | null
+  invoices: BillingInvoice[]
+  summary: BillingSummary
+}
+
 export interface PlatformDashboard {
   totalMerchants: number
   activeMerchants: number
