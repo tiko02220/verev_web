@@ -168,10 +168,10 @@ export interface PlatformDashboard {
 }
 
 export interface NotificationSettings {
-  notificationEmail: string
-  telegramChatId: string
   emailEnabled: boolean
   telegramEnabled: boolean
+  emails: string[]
+  telegramChatIds: string[]
 }
 
 export interface ModerationPromotion {
