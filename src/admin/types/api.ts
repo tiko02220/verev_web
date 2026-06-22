@@ -351,17 +351,17 @@ export interface ModerationCardDesign {
 
 export interface AppUpdateConfig {
   platform: string
-  latestVersionName: string
-  latestVersionCode: number
-  minimumVersionCode: number
+  latestVersion: string
+  forceVersion: string
+  suggestedVersion: string
   storeUrl: string
   updatedAt: string
 }
 
 export interface UpsertAppUpdateRequest {
-  latestVersionName: string
-  latestVersionCode: number
-  minimumVersionCode: number
+  latestVersion: string
+  forceVersion: string
+  suggestedVersion: string
   storeUrl: string
 }
 
