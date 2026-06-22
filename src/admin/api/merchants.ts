@@ -8,10 +8,12 @@ import type {
   AdminLedgerEntry,
   AdminProgram,
   AdminProgramResponseModel,
+  AdminRewardSummary,
   AdminStaff,
   AdminStore,
   AdminTransaction,
   AdminTransactionSummary,
+  CreateProgramRequest,
   CreateStaffRequest,
   CreateStoreRequest,
   CreatedStaffResponse,
@@ -100,6 +102,13 @@ export function useMerchantPrograms(organizationId: string) {
   return useQuery({
     queryKey: ['merchant-programs', organizationId],
     queryFn: () => api.get<AdminProgram[]>('/v1/admin/organizations/programs', { organizationId }),
+  })
+}
+
+export function useMerchantRewards(organizationId: string) {
+  return useQuery({
+    queryKey: ['merchant-rewards', organizationId],
+    queryFn: () => api.get<AdminRewardSummary[]>('/v1/admin/organizations/rewards', { organizationId }),
   })
 }
 
@@ -317,6 +326,36 @@ export function useAdjustCustomerPoints(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: ['merchant-ledger', organizationId] })
       queryClient.invalidateQueries({ queryKey: ['merchant-overview', organizationId] })
     },
+  })
+}
+
+export function useCreateProgram(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: CreateProgramRequest) =>
+      api.post<AdminProgramResponseModel>('/v1/admin/organizations/program/create', request, { organizationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['merchant-programs', organizationId] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-overview', organizationId] })
+    },
+  })
+}
+
+export function useSetRewardActive(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ rewardId, active }: { rewardId: string; active: boolean }) =>
+      api.post<AdminRewardSummary>(`/v1/admin/organizations/reward/${active ? 'enable' : 'disable'}`, undefined, { organizationId, rewardId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-rewards', organizationId] }),
+  })
+}
+
+export function useDeleteReward(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ rewardId }: { rewardId: string }) =>
+      api.post<AdminRewardSummary>('/v1/admin/organizations/reward/delete', undefined, { organizationId, rewardId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-rewards', organizationId] }),
   })
 }
 

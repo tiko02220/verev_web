@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 export interface SimpleColumn<T> {
   header: string
   align?: 'left' | 'right'
+  stopClick?: boolean
   render: (row: T) => ReactNode
 }
 
@@ -10,9 +11,10 @@ interface SimpleTableProps<T> {
   rows: T[]
   columns: SimpleColumn<T>[]
   getKey: (row: T) => string
+  onRowClick?: (row: T) => void
 }
 
-export function SimpleTable<T>({ rows, columns, getKey }: SimpleTableProps<T>) {
+export function SimpleTable<T>({ rows, columns, getKey, onRowClick }: SimpleTableProps<T>) {
   return (
     <div className="admin-scroll overflow-x-auto rounded-card border border-slate-200/70 bg-white shadow-card">
       <table className="w-full border-collapse text-sm">
@@ -27,9 +29,17 @@ export function SimpleTable<T>({ rows, columns, getKey }: SimpleTableProps<T>) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={getKey(row)} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
+            <tr
+              key={getKey(row)}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={`border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 ${onRowClick ? 'cursor-pointer' : ''}`}
+            >
               {columns.map((column) => (
-                <td key={column.header} className={`px-5 py-3.5 align-middle ${column.align === 'right' ? 'text-right' : 'text-left'}`}>
+                <td
+                  key={column.header}
+                  onClick={column.stopClick ? (event) => event.stopPropagation() : undefined}
+                  className={`px-5 py-3.5 align-middle ${column.align === 'right' ? 'text-right' : 'text-left'}`}
+                >
                   {column.render(row)}
                 </td>
               ))}

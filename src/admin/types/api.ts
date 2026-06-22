@@ -85,11 +85,22 @@ export interface CreateStoreRequest {
 export const STAFF_ROLES = ['OWNER', 'STORE_MANAGER', 'CASHIER', 'STAFF'] as const
 export type StaffRole = (typeof STAFF_ROLES)[number]
 
+export interface StaffPermissions {
+  viewAnalytics: boolean
+  managePrograms: boolean
+  processTransactions: boolean
+  manageStaff: boolean
+}
+
 export interface CreateStaffRequest {
   firstName: string
   lastName: string
   email: string
+  phoneNumber: string
   role: string
+  permissions: StaffPermissions
+  primaryStoreId: string
+  storeIds: string[]
 }
 
 export interface CreatedStaffResponse {
@@ -128,6 +139,49 @@ export interface AdminProgramResponseModel {
   name: string
   type: string
   active: boolean
+}
+
+export const PROGRAM_TYPES = ['DIGITAL_STAMP', 'TIER', 'PURCHASE_FREQUENCY', 'REFERRAL'] as const
+export type ProgramType = (typeof PROGRAM_TYPES)[number]
+
+export const PROGRAM_SCOPES = ['BRANCH', 'GLOBAL'] as const
+export type ProgramScope = (typeof PROGRAM_SCOPES)[number]
+
+export const TIER_THRESHOLD_BASES = ['POINTS', 'SPEND'] as const
+export type TierThresholdBasis = (typeof TIER_THRESHOLD_BASES)[number]
+
+export interface CreateProgramRequest {
+  name: string
+  type: string
+  scope: string
+  active: boolean
+  tierSilverThreshold: number
+  tierGoldThreshold: number
+  tierVipThreshold: number
+  tierThresholdBasis: string
+  checkInVisitsRequired: number
+  checkInRewardPoints: number
+  checkInRewardName: string
+  purchaseFrequencyCount: number
+  purchaseFrequencyWindowDays: number
+  purchaseFrequencyRewardPoints: number
+  referralReferrerRewardPoints: number
+  referralRefereeRewardPoints: number
+  storeId: string
+}
+
+export interface AdminRewardSummary {
+  id: string
+  storeId: string
+  name: string
+  description: string
+  pointsRequired: number
+  rewardType: string
+  catalogType: string
+  activeStatus: boolean
+  inventoryTracked: boolean
+  availableQuantity: number
+  imageUri: string
 }
 
 export interface UpdateCampaignRequest {
@@ -178,6 +232,7 @@ export interface AdminCampaign {
   active: boolean
   startDate: string
   endDate: string
+  giveawayType: string
 }
 
 export interface AdminTransaction {
@@ -396,6 +451,57 @@ export interface AdminCustomer {
   status: string
   lastVisitAt: string | null
   enrolledAt: string
+}
+
+export interface PlatformCustomerSummary {
+  customerId: string
+  firstName: string
+  lastName: string
+  phoneNumber: string
+  email: string
+  loyaltyId: string
+  enrolledDate: string
+  organizationCount: number
+}
+
+export interface PlatformCustomerLedgerEntry {
+  id: string
+  transactionId: string
+  pointsDelta: number
+  reasonCode: string
+  createdAt: string
+}
+
+export interface PlatformCustomerOrgAffiliation {
+  organizationId: string
+  organizationName: string
+  currentPoints: number
+  lifetimePointsEarned: number
+  lifetimePointsRedeemed: number
+  loyaltyTier: string
+  status: string
+  totalVisits: number
+  totalSpent: number
+  lastVisitAt: string | null
+  enrolledAt: string
+  recentLedger: PlatformCustomerLedgerEntry[]
+}
+
+export interface PlatformCustomerIdentity {
+  customerId: string
+  firstName: string
+  lastName: string
+  phoneNumber: string
+  email: string
+  gender: string
+  birthDate: string
+  loyaltyId: string
+  enrolledDate: string
+}
+
+export interface PlatformCustomerDetail {
+  customer: PlatformCustomerIdentity
+  organizations: PlatformCustomerOrgAffiliation[]
 }
 
 export interface MerchantDetail {

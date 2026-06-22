@@ -72,7 +72,6 @@ export function MerchantsPage() {
                   <tr className="border-b border-slate-200/70 bg-slate-50/60 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <th className="px-5 py-3 text-left">Merchant</th>
                     <th className="px-5 py-3 text-left">Status</th>
-                    <th className="px-5 py-3 text-left">Access</th>
                     <th className="px-5 py-3 text-right">Stores</th>
                     <th className="px-5 py-3 text-right">Staff</th>
                     <th className="px-5 py-3 text-right">Customers</th>
@@ -92,10 +91,11 @@ export function MerchantsPage() {
                         <span className="mono block text-xs text-slate-400">{merchant.slug}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <StatusPill tone={accessStateTone(merchant.accessState)}>{humanize(merchant.accessState)}</StatusPill>
+                        {merchant.accessState !== 'ACTIVE' ? (
+                          <StatusPill tone={accessStateTone(merchant.accessState)}>{humanize(merchant.accessState)}</StatusPill>
+                        ) : (
+                          <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
+                        )}
                       </td>
                       <td className="mono px-5 py-3.5 text-right text-slate-700">{formatNumber(merchant.storeCount)}</td>
                       <td className="mono px-5 py-3.5 text-right text-slate-700">{formatNumber(merchant.staffCount)}</td>

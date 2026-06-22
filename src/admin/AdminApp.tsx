@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { MerchantsPage } from './pages/MerchantsPage'
 import { MerchantDetailPage } from './pages/MerchantDetailPage'
+import { CustomersPage } from './pages/CustomersPage'
+import { CustomerDetailPage } from './pages/CustomerDetailPage'
 import { AuditPage } from './pages/AuditPage'
 import { AppUpdatesPage } from './pages/AppUpdatesPage'
 import { AdminsPage } from './pages/AdminsPage'
@@ -32,6 +34,8 @@ export default function AdminApp() {
               <Route index element={<DashboardPage />} />
               <Route path="merchants" element={<MerchantsPage />} />
               <Route path="merchants/:merchantId" element={<MerchantDetailPage />} />
+              <Route path="customers" element={<CustomersPage />} />
+              <Route path="customers/:customerId" element={<CustomerDetailPage />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="moderation" element={<ModerationPage />} />
               <Route path="app-updates" element={<AppUpdatesPage />} />

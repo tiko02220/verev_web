@@ -3,13 +3,11 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  Ban,
+  ChevronRight,
   CircleCheck,
   Coins,
   Copy,
-  Eye,
   KeyRound,
-  Lock,
   Pencil,
   Plus,
   Power,
@@ -50,12 +48,13 @@ import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import { useDebounce } from '../lib/useDebounce'
 import { accessStateTone, formatDate, formatNumber, humanize, orgStatusTone } from '../lib/format'
-import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, TextField } from '../components/ui/primitives'
+import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, Switch, TextField } from '../components/ui/primitives'
 import type { PillTone } from '../components/ui/primitives'
 import { ConfirmDialog, Modal } from '../components/ui/Dialog'
 import { SimpleTable } from '../components/ui/SimpleTable'
 import type { SimpleColumn } from '../components/ui/SimpleTable'
-import { ProgramsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
+import { DetailDrawer, DetailRow, DetailSection } from '../components/ui/DetailDrawer'
+import { ProgramsTab, RewardsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
 import { ApiError } from '../lib/apiClient'
 import { STAFF_ROLES } from '../types/api'
 import type {
@@ -68,6 +67,7 @@ import type {
   MerchantDetail,
   OrganizationAccessState,
   PointsAdjustmentRequest,
+  StaffPermissions,
   UpdateCustomerRequest,
   UpdateProfileRequest,
   UpdateStoreRequest,
@@ -79,7 +79,8 @@ const TABS = [
   { key: 'staff', label: 'Staff' },
   { key: 'customers', label: 'Customers' },
   { key: 'programs', label: 'Programs' },
-  { key: 'campaigns', label: 'Campaigns' },
+  { key: 'rewards', label: 'Rewards' },
+  { key: 'campaigns', label: 'Promotions' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'ledger', label: 'Ledger' },
   { key: 'approvals', label: 'Approvals' },
@@ -116,8 +117,10 @@ export function MerchantDetailPage() {
               {merchant ? (
                 <>
                   <h1 className="text-xl font-semibold tracking-tight text-ink">{merchant.displayName}</h1>
-                  <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
                   <StatusPill tone={accessStateTone(merchant.accessState)}>{humanize(merchant.accessState)}</StatusPill>
+                  {humanize(merchant.status) !== humanize(merchant.accessState) ? (
+                    <StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>
+                  ) : null}
                 </>
               ) : (
                 <Skeleton className="h-7 w-48" />
@@ -152,6 +155,8 @@ export function MerchantDetailPage() {
           <CustomersTab merchantId={merchantId} />
         ) : tab === 'programs' ? (
           <ProgramsTab merchantId={merchantId} />
+        ) : tab === 'rewards' ? (
+          <RewardsTab merchantId={merchantId} />
         ) : tab === 'campaigns' ? (
           <CampaignsTab merchantId={merchantId} />
         ) : tab === 'transactions' ? (
@@ -179,149 +184,31 @@ function BackLink() {
   )
 }
 
-interface AccessStateMeta {
-  label: string
-  tone: PillTone
-  icon: typeof CircleCheck
-  login: string
-  writes: string
-}
-
-const ACCESS_STATE_META: Record<OrganizationAccessState, AccessStateMeta> = {
-  ACTIVE: {
-    label: 'Active',
-    tone: 'success',
-    icon: CircleCheck,
-    login: 'Owner and staff can log in',
-    writes: 'Full access — can make changes',
-  },
-  READ_ONLY_GRACE: {
-    label: 'Read-only',
-    tone: 'warning',
-    icon: Eye,
-    login: 'Owner and staff can log in',
-    writes: 'Cannot make any changes',
-  },
-  SUSPENDED: {
-    label: 'Suspended',
-    tone: 'danger',
-    icon: Lock,
-    login: 'All login blocked',
-    writes: 'All access blocked',
-  },
-  CANCELLED: {
-    label: 'Cancelled',
-    tone: 'neutral',
-    icon: Ban,
-    login: 'Account closed',
-    writes: 'Closed — irreversible',
-  },
-}
-
-interface AccessAction {
-  target: OrganizationAccessState
-  label: string
-  icon: typeof CircleCheck
-  buttonClass: string
-  confirmTitle: string
-  confirmLabel: string
-  confirmTone: 'primary' | 'danger'
-  effect: ReactNode
-}
-
-function availableActions(current: OrganizationAccessState): AccessAction[] {
-  const actions: AccessAction[] = []
-
-  if (current !== 'ACTIVE' && current !== 'CANCELLED') {
-    actions.push({
-      target: 'ACTIVE',
-      label: 'Restore to active',
-      icon: CircleCheck,
-      buttonClass: 'text-emerald-700',
-      confirmTitle: 'Restore merchant to active',
-      confirmLabel: 'Restore to active',
-      confirmTone: 'primary',
-      effect: (
-        <span>
-          Restores <span className="font-semibold text-slate-900">full access</span>. Owner and staff can log in and make changes again. Takes effect
-          immediately.
-        </span>
-      ),
-    })
-  }
-
-  if (current !== 'READ_ONLY_GRACE' && current !== 'CANCELLED') {
-    actions.push({
-      target: 'READ_ONLY_GRACE',
-      label: 'Set read-only',
-      icon: Eye,
-      buttonClass: 'text-amber-700',
-      confirmTitle: 'Set merchant to read-only',
-      confirmLabel: 'Set read-only',
-      confirmTone: 'primary',
-      effect: (
-        <span>
-          Owner and staff can still log in but <span className="font-semibold text-slate-900">cannot make any changes</span>. Useful as a grace period before
-          suspending. Takes effect immediately.
-        </span>
-      ),
-    })
-  }
-
-  if (current !== 'SUSPENDED' && current !== 'CANCELLED') {
-    actions.push({
-      target: 'SUSPENDED',
-      label: 'Suspend merchant',
-      icon: Lock,
-      buttonClass: 'text-red-600',
-      confirmTitle: 'Suspend merchant',
-      confirmLabel: 'Suspend merchant',
-      confirmTone: 'danger',
-      effect: (
-        <span>
-          Blocks <span className="font-semibold text-slate-900">all staff and owner login and access</span> — none of them can log in or perform any action
-          until you restore the merchant. Takes effect immediately.
-        </span>
-      ),
-    })
-  }
-
-  if (current !== 'CANCELLED') {
-    actions.push({
-      target: 'CANCELLED',
-      label: 'Cancel account',
-      icon: Ban,
-      buttonClass: 'text-slate-700',
-      confirmTitle: 'Cancel merchant account',
-      confirmLabel: 'Cancel account',
-      confirmTone: 'danger',
-      effect: (
-        <span>
-          Marks the account <span className="font-semibold text-slate-900">closed</span>. This is a terminal lifecycle state and is not reversible from here.
-        </span>
-      ),
-    })
-  }
-
-  return actions
+const ACCESS_LABEL: Record<OrganizationAccessState, { label: string; tone: PillTone; line: string }> = {
+  ACTIVE: { label: 'Enabled', tone: 'success', line: 'Owner and staff can log in and use the app.' },
+  READ_ONLY_GRACE: { label: 'Read-only', tone: 'warning', line: 'Owner and staff can log in but cannot make changes.' },
+  SUSPENDED: { label: 'Disabled', tone: 'danger', line: 'All owner and staff login and access is blocked.' },
+  CANCELLED: { label: 'Closed', tone: 'neutral', line: 'This account is closed.' },
 }
 
 function LifecycleCard({ merchantId, accessState }: { merchantId: string; accessState: OrganizationAccessState }) {
   const { admin } = useAdminAuth()
   const mutation = useUpdateAccessState(merchantId)
-  const [pending, setPending] = useState<AccessAction | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [errorText, setErrorText] = useState<string | null>(null)
 
   const canManage = admin ? can(admin.role, 'merchants.suspend') : false
-  const current = ACCESS_STATE_META[accessState]
-  const CurrentIcon = current.icon
+  const meta = ACCESS_LABEL[accessState]
+  const isEnabled = accessState === 'ACTIVE'
+  const isClosed = accessState === 'CANCELLED'
+  const target: OrganizationAccessState = isEnabled ? 'SUSPENDED' : 'ACTIVE'
 
-  function apply(action: AccessAction, reason?: string) {
+  function apply(reason?: string) {
     setErrorText(null)
     mutation.mutate(
-      { accessState: action.target, reasonText: reason || undefined },
+      { accessState: target, reasonText: reason || undefined },
       {
-        onSuccess: () => setPending(null),
+        onSuccess: () => setConfirming(false),
         onError: (error) => setErrorText(error instanceof ApiError ? error.message : 'Action failed'),
       },
     )
@@ -329,108 +216,48 @@ function LifecycleCard({ merchantId, accessState }: { merchantId: string; access
 
   return (
     <Card className="p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Access &amp; lifecycle</h2>
-          <p className="mt-1 text-sm text-slate-500">Controls whether this merchant’s owner and staff can log in and make changes.</p>
+          <h2 className="text-sm font-semibold text-slate-900">Merchant access</h2>
+          <p className="mt-1 text-sm text-slate-500">{meta.line}</p>
         </div>
-        <StatusPill tone={current.tone}>{current.label}</StatusPill>
+        <StatusPill tone={meta.tone}>{meta.label}</StatusPill>
       </div>
 
-      <div className={`mt-4 flex items-start gap-3 rounded-xl p-4 ring-1 ring-inset ${ACCESS_BANNER[accessState]}`}>
-        <CurrentIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
-        <div className="text-sm">
-          <p className="font-medium text-slate-900">Currently {current.label.toLowerCase()}</p>
-          <ul className="mt-1.5 space-y-1 text-slate-600">
-            <li>
-              <span className="font-medium text-slate-700">Login:</span> {current.login}
-            </li>
-            <li>
-              <span className="font-medium text-slate-700">Changes:</span> {current.writes}
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {ACCESS_STATE_ORDER.map((state) => {
-          const meta = ACCESS_STATE_META[state]
-          const Icon = meta.icon
-          const isCurrent = state === accessState
-          return (
-            <div
-              key={state}
-              className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${isCurrent ? 'border-brand/40 bg-brand-soft/40' : 'border-slate-200'}`}
-            >
-              <Icon className="mt-0.5 size-4 shrink-0 text-slate-400" aria-hidden />
-              <div className="text-xs">
-                <dt className="font-semibold text-slate-800">{meta.label}</dt>
-                <dd className="mt-0.5 text-slate-500">{ACCESS_STATE_BLURB[state]}</dd>
-              </div>
-            </div>
-          )
-        })}
-      </dl>
-
-      {canManage ? (
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-          {availableActions(accessState).map((action) => {
-            const Icon = action.icon
-            return (
-              <Button
-                key={action.target}
-                variant="secondary"
-                icon={<Icon className="size-4" aria-hidden />}
-                className={action.buttonClass}
-                disabled={mutation.isPending}
-                onClick={() => {
-                  setErrorText(null)
-                  setPending(action)
-                }}
-              >
-                {action.label}
-              </Button>
-            )
-          })}
+      {canManage && !isClosed ? (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
+          <div className="text-sm">
+            <p className="font-medium text-slate-900">{isEnabled ? 'Login enabled' : 'Login disabled'}</p>
+            <p className="text-slate-500">
+              {isEnabled ? 'Turn off to block all owner and staff login.' : 'Turn on to restore login and access.'}
+            </p>
+          </div>
+          <Switch checked={isEnabled} disabled={mutation.isPending} onChange={() => { setErrorText(null); setConfirming(true) }} />
         </div>
       ) : null}
 
       <ConfirmDialog
-        open={pending !== null}
-        title={pending?.confirmTitle ?? ''}
+        open={confirming}
+        title={target === 'SUSPENDED' ? 'Disable this merchant?' : 'Enable this merchant?'}
         description={
           <div className="flex flex-col gap-2">
-            {pending?.effect}
+            <span>
+              {target === 'SUSPENDED'
+                ? 'Blocks all owner and staff login and access immediately — no one at this merchant can log in or do anything until you turn it back on.'
+                : 'Restores full login and access for the owner and staff immediately.'}
+            </span>
             {errorText ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</span> : null}
           </div>
         }
-        confirmLabel={pending?.confirmLabel ?? 'Confirm'}
-        tone={pending?.confirmTone ?? 'primary'}
+        confirmLabel={target === 'SUSPENDED' ? 'Disable merchant' : 'Enable merchant'}
+        tone={target === 'SUSPENDED' ? 'danger' : 'primary'}
         withReason
         isLoading={mutation.isPending}
-        onConfirm={(reason) => {
-          if (pending) apply(pending, reason)
-        }}
-        onClose={() => setPending(null)}
+        onConfirm={(reason) => apply(reason)}
+        onClose={() => setConfirming(false)}
       />
     </Card>
   )
-}
-
-const ACCESS_STATE_ORDER: ReadonlyArray<OrganizationAccessState> = ['ACTIVE', 'READ_ONLY_GRACE', 'SUSPENDED', 'CANCELLED']
-
-const ACCESS_STATE_BLURB: Record<OrganizationAccessState, string> = {
-  ACTIVE: 'Full access to log in and make changes.',
-  READ_ONLY_GRACE: 'Can log in, cannot make changes.',
-  SUSPENDED: 'Login and all access blocked — this is “disable the merchant”.',
-  CANCELLED: 'Account closed. Terminal and irreversible.',
-}
-
-const ACCESS_BANNER: Record<OrganizationAccessState, string> = {
-  ACTIVE: 'bg-emerald-50/70 text-emerald-700 ring-emerald-600/10',
-  READ_ONLY_GRACE: 'bg-amber-50/70 text-amber-700 ring-amber-600/10',
-  SUSPENDED: 'bg-red-50/70 text-red-700 ring-red-600/10',
-  CANCELLED: 'bg-slate-100 text-slate-600 ring-slate-500/10',
 }
 
 function OverviewTab({ merchantId, merchant }: { merchantId: string; merchant: MerchantDetail | undefined }) {
@@ -794,6 +621,7 @@ function StoresTab({ merchantId }: { merchantId: string }) {
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<AdminStore | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<AdminStore | null>(null)
 
   const addButton = canManage ? (
     <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
@@ -809,39 +637,11 @@ function StoresTab({ merchantId }: { merchantId: string }) {
     { header: 'Category', render: (store) => <span className="text-slate-600">{store.category || '—'}</span> },
     { header: 'Status', render: (store) => <StatusPill tone={activeTone(store.active)}>{store.active ? 'Active' : 'Inactive'}</StatusPill> },
   ]
-  if (canManage) {
-    columns.push({
-      header: 'Actions',
-      align: 'right',
-      render: (store) => (
-        <div className="flex justify-end gap-1">
-          <Button variant="ghost" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(store)} className="h-8 px-2">
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<Power className="size-4" aria-hidden />}
-            isLoading={setActive.isPending && setActive.variables?.storeId === store.id}
-            onClick={() => setActive.mutate({ storeId: store.id, active: !store.active })}
-            className={`h-8 px-2 ${store.active ? 'text-red-600' : 'text-brand-dark'}`}
-          >
-            {store.active ? 'Deactivate' : 'Activate'}
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<Trash2 className="size-4" aria-hidden />}
-            onClick={() => {
-              setDeleteError(null)
-              setDeleting(store)
-            }}
-            className="h-8 px-2 text-red-600"
-          >
-            Delete
-          </Button>
-        </div>
-      ),
-    })
-  }
+  columns.push({
+    header: '',
+    align: 'right',
+    render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden />,
+  })
 
   return (
     <div className="space-y-4">
@@ -849,8 +649,56 @@ function StoresTab({ merchantId }: { merchantId: string }) {
       {!data || data.length === 0 ? (
         <StateBlock icon={<Store className="size-7" aria-hidden />} title="No stores" action={addButton ?? undefined} />
       ) : (
-        <SimpleTable<AdminStore> rows={data} getKey={(store) => store.id} columns={columns} />
+        <SimpleTable<AdminStore> rows={data} getKey={(store) => store.id} columns={columns} onRowClick={setViewing} />
       )}
+      <DetailDrawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing?.name ?? ''}
+        subtitle={viewing?.category || 'Store'}
+        status={viewing ? <StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill> : undefined}
+        actions={
+          viewing && canManage ? (
+            <>
+              <Button
+                variant="secondary"
+                icon={<Trash2 className="size-4" aria-hidden />}
+                className="text-red-600"
+                onClick={() => {
+                  setDeleteError(null)
+                  setDeleting(viewing)
+                  setViewing(null)
+                }}
+              >
+                Delete
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Power className="size-4" aria-hidden />}
+                className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
+                isLoading={setActive.isPending}
+                onClick={() => setActive.mutate({ storeId: viewing.id, active: !viewing.active })}
+              >
+                {viewing.active ? 'Deactivate' : 'Activate'}
+              </Button>
+              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditing(viewing); setViewing(null) }}>
+                Edit
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {viewing ? (
+          <DetailSection title="Store details">
+            <DetailRow label="Name" value={viewing.name} />
+            <DetailRow label="Category" value={viewing.category} />
+            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
+            <DetailRow label="Address" value={viewing.address} />
+            <DetailRow label="Contact" value={<span className="mono">{viewing.contactInfo}</span>} />
+            <DetailRow label="Working hours" value={viewing.workingHours} />
+          </DetailSection>
+        ) : null}
+      </DetailDrawer>
       <StoreEditDialog merchantId={merchantId} store={editing} onClose={() => setEditing(null)} />
       <StoreCreateDialog merchantId={merchantId} open={creating} onClose={() => setCreating(false)} />
       <ConfirmDialog
@@ -1002,6 +850,7 @@ function StaffTab({ merchantId }: { merchantId: string }) {
   const [resetting, setResetting] = useState<AdminStaff | null>(null)
   const [resetError, setResetError] = useState<string | null>(null)
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<AdminStaff | null>(null)
 
   const addButton = canManage ? (
     <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
@@ -1021,50 +870,11 @@ function StaffTab({ merchantId }: { merchantId: string }) {
     { header: 'Role', render: (member) => <span className="text-slate-600">{humanize(member.role)}</span> },
     { header: 'Status', render: (member) => <StatusPill tone={activeTone(member.active)}>{member.active ? 'Active' : 'Inactive'}</StatusPill> },
   ]
-  if (canManage) {
-    columns.push({
-      header: 'Actions',
-      align: 'right',
-      render: (member) => (
-        <div className="flex justify-end gap-1">
-          <Button variant="ghost" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditingRole(member)} className="h-8 px-2">
-            Role
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<KeyRound className="size-4" aria-hidden />}
-            onClick={() => {
-              setResetError(null)
-              setResetting(member)
-            }}
-            className="h-8 px-2 text-slate-600"
-          >
-            Reset password
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<Power className="size-4" aria-hidden />}
-            isLoading={setActive.isPending && setActive.variables?.staffId === member.id}
-            onClick={() => setActive.mutate({ staffId: member.id, active: !member.active })}
-            className={`h-8 px-2 ${member.active ? 'text-red-600' : 'text-brand-dark'}`}
-          >
-            {member.active ? 'Deactivate' : 'Activate'}
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<Trash2 className="size-4" aria-hidden />}
-            onClick={() => {
-              setDeleteError(null)
-              setDeleting(member)
-            }}
-            className="h-8 px-2 text-red-600"
-          >
-            Delete
-          </Button>
-        </div>
-      ),
-    })
-  }
+  columns.push({
+    header: '',
+    align: 'right',
+    render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden />,
+  })
 
   return (
     <div className="space-y-4">
@@ -1072,8 +882,57 @@ function StaffTab({ merchantId }: { merchantId: string }) {
       {!data || data.length === 0 ? (
         <StateBlock icon={<Users className="size-7" aria-hidden />} title="No staff" action={addButton ?? undefined} />
       ) : (
-        <SimpleTable<AdminStaff> rows={data} getKey={(member) => member.id} columns={columns} />
+        <SimpleTable<AdminStaff> rows={data} getKey={(member) => member.id} columns={columns} onRowClick={setViewing} />
       )}
+      <DetailDrawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing ? `${viewing.firstName} ${viewing.lastName}`.trim() || 'Staff member' : ''}
+        subtitle={viewing ? humanize(viewing.role) : undefined}
+        status={viewing ? <StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill> : undefined}
+        actions={
+          viewing && canManage ? (
+            <>
+              <Button
+                variant="secondary"
+                icon={<Trash2 className="size-4" aria-hidden />}
+                className="text-red-600"
+                onClick={() => { setDeleteError(null); setDeleting(viewing); setViewing(null) }}
+              >
+                Delete
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<KeyRound className="size-4" aria-hidden />}
+                onClick={() => { setResetError(null); setResetting(viewing); setViewing(null) }}
+              >
+                Reset password
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Power className="size-4" aria-hidden />}
+                className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
+                isLoading={setActive.isPending}
+                onClick={() => setActive.mutate({ staffId: viewing.id, active: !viewing.active })}
+              >
+                {viewing.active ? 'Deactivate' : 'Activate'}
+              </Button>
+              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditingRole(viewing); setViewing(null) }}>
+                Role
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {viewing ? (
+          <DetailSection title="Staff member">
+            <DetailRow label="Name" value={`${viewing.firstName} ${viewing.lastName}`.trim()} />
+            <DetailRow label="Email" value={viewing.email} />
+            <DetailRow label="Role" value={humanize(viewing.role)} />
+            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
+          </DetailSection>
+        ) : null}
+      </DetailDrawer>
       <StaffRoleDialog merchantId={merchantId} member={editingRole} onClose={() => setEditingRole(null)} />
       <StaffCreateDialog merchantId={merchantId} open={creating} onClose={() => setCreating(false)} onCreated={(password) => setRevealedPassword(password)} />
       <ConfirmDialog
@@ -1143,10 +1002,28 @@ function StaffTab({ merchantId }: { merchantId: string }) {
   )
 }
 
-const EMPTY_STAFF_FORM: CreateStaffRequest = { firstName: '', lastName: '', email: '', role: 'CASHIER' }
+const EMPTY_STAFF_FORM: CreateStaffRequest = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: '',
+  role: 'CASHIER',
+  permissions: { viewAnalytics: false, managePrograms: false, processTransactions: true, manageStaff: false },
+  primaryStoreId: '',
+  storeIds: [],
+}
+
+const STAFF_PERMISSION_FIELDS: ReadonlyArray<{ key: keyof StaffPermissions; label: string }> = [
+  { key: 'viewAnalytics', label: 'View analytics' },
+  { key: 'managePrograms', label: 'Manage programs' },
+  { key: 'processTransactions', label: 'Process transactions' },
+  { key: 'manageStaff', label: 'Manage staff' },
+]
 
 function StaffCreateDialog({ merchantId, open, onClose, onCreated }: { merchantId: string; open: boolean; onClose: () => void; onCreated: (password: string) => void }) {
   const mutation = useCreateStaff(merchantId)
+  const storesQuery = useMerchantStores(merchantId)
+  const stores = storesQuery.data ?? []
   const [form, setForm] = useState<CreateStaffRequest>(EMPTY_STAFF_FORM)
   const [errorText, setErrorText] = useState<string | null>(null)
   const [wasOpen, setWasOpen] = useState(open)
@@ -1160,13 +1037,39 @@ function StaffCreateDialog({ merchantId, open, onClose, onCreated }: { merchantI
   }
 
   const emailValid = isValidEmail(form.email)
-  const canSubmit = form.firstName.trim().length > 0 && emailValid
+  const canSubmit =
+    form.firstName.trim().length > 0 &&
+    emailValid &&
+    form.phoneNumber.trim().length > 0 &&
+    form.role.length > 0 &&
+    form.primaryStoreId.length > 0
 
-  function field(key: keyof CreateStaffRequest) {
-    return (value: string) => setForm((current) => ({ ...current, [key]: value }))
+  function set<K extends keyof CreateStaffRequest>(key: K, value: CreateStaffRequest[K]) {
+    setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  function selectPrimaryStore(storeId: string) {
+    setForm((current) => ({
+      ...current,
+      primaryStoreId: storeId,
+      storeIds: storeId && !current.storeIds.includes(storeId) ? [...current.storeIds, storeId] : current.storeIds,
+    }))
+  }
+
+  function toggleStore(storeId: string, checked: boolean) {
+    setForm((current) => {
+      const storeIds = checked ? [...current.storeIds, storeId] : current.storeIds.filter((id) => id !== storeId)
+      const primaryStoreId = !checked && current.primaryStoreId === storeId ? '' : current.primaryStoreId
+      return { ...current, storeIds, primaryStoreId }
+    })
+  }
+
+  function togglePermission(key: keyof StaffPermissions, value: boolean) {
+    setForm((current) => ({ ...current, permissions: { ...current.permissions, [key]: value } }))
   }
 
   function save() {
+    if (!canSubmit) return
     setErrorText(null)
     mutation.mutate(form, {
       onSuccess: (result) => {
@@ -1194,20 +1097,21 @@ function StaffCreateDialog({ merchantId, open, onClose, onCreated }: { merchantI
       }
     >
       <div className="flex flex-col gap-3">
-        <TextField label="First name" value={form.firstName} onChange={(event) => field('firstName')(event.target.value)} />
-        <TextField label="Last name" value={form.lastName} onChange={(event) => field('lastName')(event.target.value)} />
+        <TextField label="First name" value={form.firstName} onChange={(event) => set('firstName', event.target.value)} />
+        <TextField label="Last name" value={form.lastName} onChange={(event) => set('lastName', event.target.value)} />
         <TextField
           label="Email"
           type="email"
           value={form.email}
-          onChange={(event) => field('email')(event.target.value)}
+          onChange={(event) => set('email', event.target.value)}
           errorText={form.email.trim().length > 0 && !emailValid ? 'Enter a valid email address' : undefined}
         />
+        <TextField label="Phone number" type="tel" value={form.phoneNumber} onChange={(event) => set('phoneNumber', event.target.value)} />
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-slate-700">Role</span>
           <select
             value={form.role}
-            onChange={(event) => field('role')(event.target.value)}
+            onChange={(event) => set('role', event.target.value)}
             className="h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
           >
             {STAFF_ROLES.map((value) => (
@@ -1217,6 +1121,51 @@ function StaffCreateDialog({ merchantId, open, onClose, onCreated }: { merchantI
             ))}
           </select>
         </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-700">Primary store</span>
+          <select
+            value={form.primaryStoreId}
+            onChange={(event) => selectPrimaryStore(event.target.value)}
+            className="h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          >
+            <option value="">Select a store</option>
+            {stores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {stores.length > 0 ? (
+          <fieldset className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3">
+            <legend className="px-1 text-xs font-medium uppercase tracking-wide text-slate-400">Assigned stores</legend>
+            {stores.map((store) => (
+              <label key={store.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.storeIds.includes(store.id)}
+                  onChange={(event) => toggleStore(store.id, event.target.checked)}
+                  className="size-4 cursor-pointer rounded border-slate-300 text-brand focus:ring-brand/30"
+                />
+                {store.name}
+                {form.primaryStoreId === store.id ? <span className="text-xs text-slate-400">(primary)</span> : null}
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
+
+        <fieldset className="flex flex-col gap-1 rounded-xl border border-slate-200 p-1">
+          <legend className="px-2 text-xs font-medium uppercase tracking-wide text-slate-400">Permissions</legend>
+          {STAFF_PERMISSION_FIELDS.map((permission) => (
+            <div key={permission.key} className="flex items-center justify-between px-2 py-2">
+              <span className="text-sm text-slate-700">{permission.label}</span>
+              <Switch checked={form.permissions[permission.key]} onChange={(checked) => togglePermission(permission.key, checked)} label={permission.label} />
+            </div>
+          ))}
+        </fieldset>
+
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">A temporary password will be generated and shown once after the member is created.</p>
         {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
       </div>
@@ -1307,6 +1256,7 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
   const setBlocked = useSetCustomerBlocked(merchantId)
   const [editing, setEditing] = useState<AdminCustomer | null>(null)
   const [adjusting, setAdjusting] = useState<AdminCustomer | null>(null)
+  const [viewing, setViewing] = useState<AdminCustomer | null>(null)
   const rows = data ?? []
   const hasNextPage = rows.length === customersPageSize
 
@@ -1327,30 +1277,14 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
     { header: 'Last visit', render: (customer) => <span className="text-slate-500">{customer.lastVisitAt ? formatDate(customer.lastVisitAt) : '—'}</span> },
     { header: 'Status', render: (customer) => <StatusPill tone={customerStatusTone(customer.status)}>{humanize(customer.status)}</StatusPill> },
   ]
-  if (canManage) {
-    columns.push({
-      header: 'Actions',
-      align: 'right',
-      render: (customer) => (
-        <div className="flex justify-end gap-1">
-          <Button variant="ghost" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(customer)} className="h-8 px-2">
-            Edit
-          </Button>
-          <Button variant="ghost" icon={<Coins className="size-4" aria-hidden />} onClick={() => setAdjusting(customer)} className="h-8 px-2 text-brand-dark">
-            Adjust points
-          </Button>
-          <Button
-            variant="ghost"
-            icon={<Power className="size-4" aria-hidden />}
-            isLoading={setBlocked.isPending && setBlocked.variables?.customerId === customer.customerId}
-            onClick={() => setBlocked.mutate({ customerId: customer.customerId, blocked: customer.status !== 'BLOCKED' })}
-            className={`h-8 px-2 ${customer.status === 'BLOCKED' ? 'text-brand-dark' : 'text-red-600'}`}
-          >
-            {customer.status === 'BLOCKED' ? 'Unblock' : 'Block'}
-          </Button>
-        </div>
-      ),
-    })
+  columns.push({
+    header: '',
+    align: 'right',
+    render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden />,
+  })
+
+  function toggleBlock(customer: AdminCustomer) {
+    setBlocked.mutate({ customerId: customer.customerId, blocked: customer.status !== 'BLOCKED' })
   }
 
   return (
@@ -1375,7 +1309,7 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
         <StateBlock icon={<UsersRound className="size-7" aria-hidden />} title="No customers" subtitle={search ? 'Try a different search.' : undefined} />
       ) : (
         <>
-          <SimpleTable<AdminCustomer> rows={rows} getKey={(customer) => customer.customerId} columns={columns} />
+          <SimpleTable<AdminCustomer> rows={rows} getKey={(customer) => customer.customerId} columns={columns} onRowClick={setViewing} />
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">{isFetching ? 'Loading…' : `Page ${page + 1}`}</span>
             <div className="flex gap-2">
@@ -1391,6 +1325,55 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
       )}
       <CustomerEditDialog merchantId={merchantId} customer={editing} onClose={() => setEditing(null)} />
       <CustomerPointsDialog merchantId={merchantId} customer={adjusting} onClose={() => setAdjusting(null)} />
+      <DetailDrawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing ? `${viewing.firstName} ${viewing.lastName}`.trim() || 'Customer' : ''}
+        subtitle={viewing?.loyaltyId}
+        status={viewing ? <StatusPill tone={customerStatusTone(viewing.status)}>{humanize(viewing.status)}</StatusPill> : undefined}
+        actions={
+          viewing && canManage ? (
+            <>
+              <Button
+                variant="secondary"
+                icon={<Power className="size-4" aria-hidden />}
+                className={viewing.status === 'BLOCKED' ? 'text-brand-dark' : 'text-red-600'}
+                isLoading={setBlocked.isPending}
+                onClick={() => toggleBlock(viewing)}
+              >
+                {viewing.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+              </Button>
+              <Button variant="secondary" icon={<Coins className="size-4" aria-hidden />} onClick={() => { setAdjusting(viewing); setViewing(null) }}>
+                Adjust points
+              </Button>
+              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditing(viewing); setViewing(null) }}>
+                Edit
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {viewing ? (
+          <>
+            <DetailSection title="Loyalty">
+              <DetailRow label="Loyalty ID" value={<span className="mono">{viewing.loyaltyId}</span>} />
+              <DetailRow label="Tier" value={humanize(viewing.loyaltyTier)} />
+              <DetailRow label="Current points" value={<span className="mono">{formatNumber(viewing.currentPoints)}</span>} />
+              <DetailRow label="Total visits" value={<span className="mono">{formatNumber(viewing.totalVisits)}</span>} />
+              <DetailRow label="Total spent" value={<span className="mono">{formatNumber(viewing.totalSpent)}</span>} />
+            </DetailSection>
+            <DetailSection title="Contact">
+              <DetailRow label="Phone" value={<span className="mono">{viewing.phoneNumber}</span>} />
+              <DetailRow label="Email" value={viewing.email} />
+            </DetailSection>
+            <DetailSection title="Activity">
+              <DetailRow label="Status" value={humanize(viewing.status)} />
+              <DetailRow label="Last visit" value={viewing.lastVisitAt ? formatDate(viewing.lastVisitAt) : 'Never'} />
+              <DetailRow label="Enrolled" value={formatDate(viewing.enrolledAt)} />
+            </DetailSection>
+          </>
+        ) : null}
+      </DetailDrawer>
     </div>
   )
 }
