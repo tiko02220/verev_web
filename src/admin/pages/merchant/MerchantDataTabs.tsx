@@ -1,21 +1,36 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { BookOpen, CreditCard, Megaphone, Receipt, ShieldCheck, Tag } from 'lucide-react'
+import { Ban, BookOpen, CreditCard, Megaphone, Pencil, Power, Receipt, ShieldCheck, Tag, Trash2 } from 'lucide-react'
+import { useAdminAuth } from '../../auth/AdminAuthContext'
+import { can } from '../../auth/permissions'
 import {
   ledgerPageSize,
+  useDeleteCampaign,
+  useDeleteProgram,
   useMerchantApprovals,
   useMerchantBilling,
   useMerchantCampaigns,
   useMerchantLedger,
   useMerchantPrograms,
   useMerchantTransactions,
+  useRenameProgram,
+  useSetCampaignActive,
+  useSetProgramActive,
+  useUpdateCampaign,
+  useVoidTransaction,
 } from '../../api/merchants'
+import { ApiError } from '../../lib/apiClient'
 import { formatDate, formatMoney, formatNumber, humanize } from '../../lib/format'
-import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill } from '../../components/ui/primitives'
+import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, TextField } from '../../components/ui/primitives'
 import type { PillTone } from '../../components/ui/primitives'
+import { ConfirmDialog, Modal } from '../../components/ui/Dialog'
 import { SimpleTable } from '../../components/ui/SimpleTable'
 import type { SimpleColumn } from '../../components/ui/SimpleTable'
-import type { AdminApproval, AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction, BillingInvoice } from '../../types/api'
+import type { AdminApproval, AdminCampaign, AdminLedgerEntry, AdminProgram, AdminTransaction, BillingInvoice, UpdateCampaignRequest } from '../../types/api'
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback
+}
 
 function activeTone(active: boolean): PillTone {
   return active ? 'success' : 'neutral'
@@ -28,6 +43,7 @@ function transactionTone(status: string): PillTone {
     case 'PENDING_APPROVAL':
       return 'warning'
     case 'REJECTED':
+    case 'VOIDED':
       return 'danger'
     default:
       return 'neutral'
@@ -53,7 +69,14 @@ function TabGate({ isLoading, isError, error, isEmpty, emptyIcon, emptyTitle, on
 }
 
 export function ProgramsTab({ merchantId }: { merchantId: string }) {
+  const { admin } = useAdminAuth()
+  const canManage = admin ? can(admin.role, 'merchants.config') : false
   const { data, isLoading, isError, error, refetch } = useMerchantPrograms(merchantId)
+  const setActive = useSetProgramActive(merchantId)
+  const deleteProgram = useDeleteProgram(merchantId)
+  const [renaming, setRenaming] = useState<AdminProgram | null>(null)
+  const [deleting, setDeleting] = useState<AdminProgram | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminProgram>[] = [
     { header: 'Name', render: (program) => <span className="font-medium text-slate-900">{program.name}</span> },
@@ -61,15 +84,123 @@ export function ProgramsTab({ merchantId }: { merchantId: string }) {
     { header: 'Created', render: (program) => <span className="text-slate-500">{formatDate(program.createdAt)}</span> },
     { header: 'Status', render: (program) => <StatusPill tone={activeTone(program.active)}>{program.active ? 'Active' : 'Inactive'}</StatusPill> },
   ]
+  if (canManage) {
+    columns.push({
+      header: 'Actions',
+      align: 'right',
+      render: (program) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setRenaming(program)} className="h-8 px-2">
+            Rename
+          </Button>
+          <Button
+            variant="ghost"
+            icon={<Power className="size-4" aria-hidden />}
+            isLoading={setActive.isPending && setActive.variables?.programId === program.id}
+            onClick={() => setActive.mutate({ programId: program.id, active: !program.active })}
+            className={`h-8 px-2 ${program.active ? 'text-red-600' : 'text-brand-dark'}`}
+          >
+            {program.active ? 'Disable' : 'Enable'}
+          </Button>
+          <Button
+            variant="ghost"
+            icon={<Trash2 className="size-4" aria-hidden />}
+            onClick={() => {
+              setDeleteError(null)
+              setDeleting(program)
+            }}
+            className="h-8 px-2 text-red-600"
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    })
+  }
   return (
     <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0} emptyIcon={<Tag className="size-7" aria-hidden />} emptyTitle="No programs" onRetry={() => refetch()}>
       <SimpleTable<AdminProgram> rows={rows} getKey={(program) => program.id} columns={columns} />
+      <ProgramRenameDialog merchantId={merchantId} program={renaming} onClose={() => setRenaming(null)} />
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete program"
+        description={
+          <div className="flex flex-col gap-2">
+            <span>
+              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> program. Customer points already earned remain in the ledger, but
+              this program stops issuing or redeeming. This action cannot be undone.
+            </span>
+            {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
+          </div>
+        }
+        confirmLabel="Delete program"
+        tone="danger"
+        isLoading={deleteProgram.isPending}
+        onConfirm={() => {
+          if (!deleting) return
+          setDeleteError(null)
+          deleteProgram.mutate({ programId: deleting.id }, { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) })
+        }}
+        onClose={() => setDeleting(null)}
+      />
     </TabGate>
   )
 }
 
+function ProgramRenameDialog({ merchantId, program, onClose }: { merchantId: string; program: AdminProgram | null; onClose: () => void }) {
+  const mutation = useRenameProgram(merchantId)
+  const [name, setName] = useState('')
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [seededId, setSeededId] = useState<string | null>(null)
+
+  if (program && program.id !== seededId) {
+    setSeededId(program.id)
+    setName(program.name)
+    setErrorText(null)
+  }
+
+  function save() {
+    if (!program) return
+    setErrorText(null)
+    mutation.mutate(
+      { programId: program.id, request: { name: name.trim() } },
+      { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Rename failed')) },
+    )
+  }
+
+  return (
+    <Modal
+      open={program !== null}
+      onClose={onClose}
+      title="Rename program"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <Button isLoading={mutation.isPending} disabled={!name.trim()} onClick={save}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <TextField label="Program name" value={name} onChange={(event) => setName(event.target.value)} />
+        {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
+      </div>
+    </Modal>
+  )
+}
+
 export function CampaignsTab({ merchantId }: { merchantId: string }) {
+  const { admin } = useAdminAuth()
+  const canManage = admin ? can(admin.role, 'merchants.config') : false
   const { data, isLoading, isError, error, refetch } = useMerchantCampaigns(merchantId)
+  const setActive = useSetCampaignActive(merchantId)
+  const deleteCampaign = useDeleteCampaign(merchantId)
+  const [editing, setEditing] = useState<AdminCampaign | null>(null)
+  const [deleting, setDeleting] = useState<AdminCampaign | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminCampaign>[] = [
     { header: 'Name', render: (campaign) => <span className="font-medium text-slate-900">{campaign.name}</span> },
@@ -78,10 +209,142 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
     { header: 'Window', render: (campaign) => <span className="text-slate-500">{`${formatDate(campaign.startDate)} → ${formatDate(campaign.endDate)}`}</span> },
     { header: 'Status', render: (campaign) => <StatusPill tone={activeTone(campaign.active)}>{campaign.active ? 'Active' : 'Inactive'}</StatusPill> },
   ]
+  if (canManage) {
+    columns.push({
+      header: 'Actions',
+      align: 'right',
+      render: (campaign) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(campaign)} className="h-8 px-2">
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            icon={<Power className="size-4" aria-hidden />}
+            isLoading={setActive.isPending && setActive.variables?.campaignId === campaign.id}
+            onClick={() => setActive.mutate({ campaignId: campaign.id, active: !campaign.active })}
+            className={`h-8 px-2 ${campaign.active ? 'text-red-600' : 'text-brand-dark'}`}
+          >
+            {campaign.active ? 'Disable' : 'Enable'}
+          </Button>
+          <Button
+            variant="ghost"
+            icon={<Trash2 className="size-4" aria-hidden />}
+            onClick={() => {
+              setDeleteError(null)
+              setDeleting(campaign)
+            }}
+            className="h-8 px-2 text-red-600"
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    })
+  }
   return (
     <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0} emptyIcon={<Megaphone className="size-7" aria-hidden />} emptyTitle="No campaigns" onRetry={() => refetch()}>
       <SimpleTable<AdminCampaign> rows={rows} getKey={(campaign) => campaign.id} columns={columns} />
+      <CampaignEditDialog merchantId={merchantId} campaign={editing} onClose={() => setEditing(null)} />
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete campaign"
+        description={
+          <div className="flex flex-col gap-2">
+            <span>
+              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> campaign. It stops applying immediately. This action cannot be
+              undone.
+            </span>
+            {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
+          </div>
+        }
+        confirmLabel="Delete campaign"
+        tone="danger"
+        isLoading={deleteCampaign.isPending}
+        onConfirm={() => {
+          if (!deleting) return
+          setDeleteError(null)
+          deleteCampaign.mutate({ campaignId: deleting.id }, { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) })
+        }}
+        onClose={() => setDeleting(null)}
+      />
     </TabGate>
+  )
+}
+
+function toCampaignForm(campaign: AdminCampaign): UpdateCampaignRequest {
+  return { name: campaign.name, startDate: campaign.startDate, endDate: campaign.endDate, promotionValue: campaign.promotionValue }
+}
+
+function CampaignEditDialog({ merchantId, campaign, onClose }: { merchantId: string; campaign: AdminCampaign | null; onClose: () => void }) {
+  const mutation = useUpdateCampaign(merchantId)
+  const [form, setForm] = useState<UpdateCampaignRequest>({ name: '', startDate: '', endDate: '', promotionValue: 0 })
+  const [valueText, setValueText] = useState('')
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [seededId, setSeededId] = useState<string | null>(null)
+
+  if (campaign && campaign.id !== seededId) {
+    setSeededId(campaign.id)
+    setForm(toCampaignForm(campaign))
+    setValueText(String(campaign.promotionValue))
+    setErrorText(null)
+  }
+
+  const value = Number(valueText)
+  const valueValid = valueText.trim().length > 0 && Number.isFinite(value) && value >= 0
+  const datesOrdered = form.startDate.trim().length === 0 || form.endDate.trim().length === 0 || form.startDate <= form.endDate
+  const canSubmit = form.name.trim().length > 0 && valueValid && datesOrdered
+
+  function field(key: 'name' | 'startDate' | 'endDate') {
+    return (next: string) => setForm((current) => ({ ...current, [key]: next }))
+  }
+
+  function save() {
+    if (!campaign || !canSubmit) return
+    setErrorText(null)
+    mutation.mutate(
+      { campaignId: campaign.id, request: { ...form, promotionValue: value } },
+      { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Update failed')) },
+    )
+  }
+
+  return (
+    <Modal
+      open={campaign !== null}
+      onClose={onClose}
+      title="Edit campaign"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <Button isLoading={mutation.isPending} disabled={!canSubmit} onClick={save}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <TextField label="Name" value={form.name} onChange={(event) => field('name')(event.target.value)} />
+        <TextField
+          label="Promotion value"
+          type="number"
+          inputMode="decimal"
+          value={valueText}
+          onChange={(event) => setValueText(event.target.value)}
+          errorText={valueText.trim().length > 0 && !valueValid ? 'Enter a non-negative number' : undefined}
+        />
+        <TextField label="Start date" type="date" value={form.startDate} onChange={(event) => field('startDate')(event.target.value)} />
+        <TextField
+          label="End date"
+          type="date"
+          value={form.endDate}
+          onChange={(event) => field('endDate')(event.target.value)}
+          errorText={!datesOrdered ? 'End date must be on or after the start date' : undefined}
+        />
+        {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
+      </div>
+    </Modal>
   )
 }
 
@@ -109,8 +372,11 @@ function Pagination({ page, hasNextPage, isFetching, onChange }: PaginationProps
 }
 
 export function TransactionsTab({ merchantId }: { merchantId: string }) {
+  const { admin } = useAdminAuth()
+  const canManage = admin ? can(admin.role, 'merchants.config') : false
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch, isFetching } = useMerchantTransactions(merchantId, page)
+  const [voiding, setVoiding] = useState<AdminTransaction | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminTransaction>[] = [
     { header: 'When', render: (txn) => <span className="text-slate-500">{formatDate(txn.occurredAt)}</span> },
@@ -120,13 +386,101 @@ export function TransactionsTab({ merchantId }: { merchantId: string }) {
     { header: 'Redeemed', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.pointsRedeemed)}</span> },
     { header: 'Status', render: (txn) => <StatusPill tone={transactionTone(txn.status)}>{humanize(txn.status)}</StatusPill> },
   ]
+  if (canManage) {
+    columns.push({
+      header: 'Actions',
+      align: 'right',
+      render: (txn) =>
+        txn.status === 'VOIDED' ? (
+          <span className="text-xs text-slate-400">Voided</span>
+        ) : (
+          <Button variant="ghost" icon={<Ban className="size-4" aria-hidden />} onClick={() => setVoiding(txn)} className="h-8 px-2 text-red-600">
+            Void
+          </Button>
+        ),
+    })
+  }
   return (
     <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<Receipt className="size-7" aria-hidden />} emptyTitle="No transactions" onRetry={() => refetch()}>
       <div className="space-y-4">
         <SimpleTable<AdminTransaction> rows={rows} getKey={(txn) => txn.id} columns={columns} />
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
+      <TransactionVoidDialog merchantId={merchantId} transaction={voiding} onClose={() => setVoiding(null)} />
     </TabGate>
+  )
+}
+
+function TransactionVoidDialog({ merchantId, transaction, onClose }: { merchantId: string; transaction: AdminTransaction | null; onClose: () => void }) {
+  const mutation = useVoidTransaction(merchantId)
+  const [reason, setReason] = useState('')
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [seededId, setSeededId] = useState<string | null>(null)
+
+  if (transaction && transaction.id !== seededId) {
+    setSeededId(transaction.id)
+    setReason('')
+    setErrorText(null)
+  }
+
+  const alreadyVoided = mutation.isError && mutation.error instanceof ApiError && mutation.error.status === 409
+  const canSubmit = reason.trim().length > 0
+
+  function save() {
+    if (!transaction || !canSubmit) return
+    setErrorText(null)
+    mutation.mutate(
+      { transactionId: transaction.id, request: { reason: reason.trim() } },
+      {
+        onSuccess: onClose,
+        onError: (error) => {
+          if (error instanceof ApiError && error.status === 409) {
+            setErrorText('This transaction has already been voided. The list will refresh to show its current status.')
+            return
+          }
+          setErrorText(errorMessage(error, 'Void failed'))
+        },
+      },
+    )
+  }
+
+  return (
+    <Modal
+      open={transaction !== null}
+      onClose={onClose}
+      title="Void transaction"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+            {alreadyVoided ? 'Close' : 'Cancel'}
+          </Button>
+          <Button variant="danger" isLoading={mutation.isPending} disabled={!canSubmit || alreadyVoided} onClick={save}>
+            Void transaction
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4 text-sm text-slate-600">
+        <div className="flex items-start gap-2.5 rounded-xl bg-red-50/70 p-3.5 text-red-700 ring-1 ring-inset ring-red-600/15">
+          <Ban className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            Voiding reverses this transaction&rsquo;s points through new <span className="font-semibold">compensating ledger entries</span> — the original records
+            are never edited. This action cannot be undone.
+          </p>
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-700">Reason</span>
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={2}
+            placeholder="Why this transaction is being voided"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          />
+        </label>
+        {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
+      </div>
+    </Modal>
   )
 }
 

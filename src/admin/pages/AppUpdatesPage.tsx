@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Plus, Smartphone } from 'lucide-react'
+import { ArrowDown, CircleCheck, Plus, ShieldAlert, Smartphone, TriangleAlert } from 'lucide-react'
 import { useAppUpdates, useUpsertAppUpdate } from '../api/platform'
 import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import { formatDate, formatNumber } from '../lib/format'
-import { Button, Card, ErrorState, PageHeader, Skeleton, StateBlock } from '../components/ui/primitives'
+import { Button, Card, ErrorState, PageHeader, Skeleton, StateBlock, StatusPill } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Dialog'
 import { TextField } from '../components/ui/primitives'
 import { ApiError } from '../lib/apiClient'
@@ -28,7 +28,7 @@ export function AppUpdatesPage() {
     <>
       <PageHeader
         title="App updates"
-        subtitle="Control forced and optional update prompts shown in the mobile apps"
+        subtitle="Decide which mobile builds are blocked, which see an optional prompt, and which are current"
         actions={
           canManage ? (
             <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditor({ platform: '', isNew: true, form: EMPTY_FORM })}>
@@ -40,8 +40,8 @@ export function AppUpdatesPage() {
       <div className="admin-rise space-y-5 p-6 sm:p-8">
         {isLoading ? (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <Skeleton className="h-56" />
-            <Skeleton className="h-56" />
+            <Skeleton className="h-72" />
+            <Skeleton className="h-72" />
           </div>
         ) : isError ? (
           <ErrorState message={error instanceof Error ? error.message : 'Failed to load app update config'} onRetry={() => refetch()} />
@@ -79,9 +79,10 @@ export function AppUpdatesPage() {
 
 function PlatformCard({ config, canManage, onEdit }: { config: AppUpdateConfig; canManage: boolean; onEdit: () => void }) {
   const forcesAll = config.minimumVersionCode >= config.latestVersionCode
+  const hasForcedBand = config.minimumVersionCode > 0
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between">
+    <Card className="flex flex-col p-5">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-xl bg-brand-soft text-brand-dark">
             <Smartphone className="size-5" aria-hidden />
@@ -91,39 +92,107 @@ function PlatformCard({ config, canManage, onEdit }: { config: AppUpdateConfig; 
             <p className="text-xs text-subtle">Updated {formatDate(config.updatedAt)}</p>
           </div>
         </div>
-        {canManage ? (
-          <Button variant="secondary" onClick={onEdit}>
-            Edit
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {forcesAll ? (
+            <StatusPill tone="danger">Forcing everyone</StatusPill>
+          ) : hasForcedBand ? (
+            <StatusPill tone="warning">Optional + forced floor</StatusPill>
+          ) : (
+            <StatusPill tone="info">Optional only</StatusPill>
+          )}
+          {canManage ? (
+            <Button variant="secondary" onClick={onEdit}>
+              Edit
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4">
-        <Stat label="Latest version" value={config.latestVersionName} sub={`code ${formatNumber(config.latestVersionCode)}`} />
-        <Stat label="Minimum required" value={`code ${formatNumber(config.minimumVersionCode)}`} sub={forcesAll ? 'forces all older builds' : 'older builds get optional prompt'} />
-      </dl>
-
-      <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-        Builds below code <span className="mono font-semibold text-red-600">{formatNumber(config.minimumVersionCode)}</span> are{' '}
-        <span className="font-semibold text-red-600">force-updated</span>; below{' '}
-        <span className="mono font-semibold text-amber-600">{formatNumber(config.latestVersionCode)}</span> get an{' '}
-        <span className="font-semibold text-amber-600">optional</span> prompt.
+      <div className="mt-5 flex items-baseline gap-2">
+        <span className="text-2xl font-semibold tracking-tight text-ink">{config.latestVersionName || '—'}</span>
+        <span className="mono text-sm text-slate-400">code {formatNumber(config.latestVersionCode)}</span>
+        <span className="ml-auto text-xs font-medium uppercase tracking-wide text-slate-400">Latest build</span>
       </div>
 
-      <a href={config.storeUrl} target="_blank" rel="noopener noreferrer" className="mono mt-3 block truncate text-xs text-brand-dark hover:underline">
+      <PolicyBands latestCode={config.latestVersionCode} minimumCode={config.minimumVersionCode} className="mt-4" />
+
+      <a
+        href={config.storeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mono mt-4 block truncate text-xs text-brand-dark hover:underline"
+      >
         {config.storeUrl}
       </a>
     </Card>
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+interface PolicyBand {
+  tone: 'danger' | 'warning' | 'success'
+  icon: typeof ShieldAlert
+  label: string
+  detail: string
+}
+
+function buildPolicyBands(latestCode: number, minimumCode: number): PolicyBand[] {
+  const safeMinimum = Math.max(0, Math.min(minimumCode, latestCode))
+  const bands: PolicyBand[] = []
+
+  if (safeMinimum > 0) {
+    bands.push({
+      tone: 'danger',
+      icon: ShieldAlert,
+      label: `Builds below ${formatNumber(safeMinimum)}`,
+      detail: 'Blocked — must update before they can use the app.',
+    })
+  }
+
+  if (safeMinimum < latestCode) {
+    const lower = formatNumber(safeMinimum)
+    const upper = formatNumber(latestCode - 1)
+    const range = safeMinimum === latestCode - 1 ? `Build ${upper}` : `Builds ${lower}–${upper}`
+    bands.push({
+      tone: 'warning',
+      icon: TriangleAlert,
+      label: range,
+      detail: 'See a dismissible “update available” prompt.',
+    })
+  }
+
+  bands.push({
+    tone: 'success',
+    icon: CircleCheck,
+    label: `Builds ${formatNumber(latestCode)}+`,
+    detail: 'Current — no prompt shown.',
+  })
+
+  return bands
+}
+
+const BAND_STYLES: Record<PolicyBand['tone'], { wrap: string; icon: string; label: string }> = {
+  danger: { wrap: 'bg-red-50/70 ring-red-600/10', icon: 'text-red-600', label: 'text-red-700' },
+  warning: { wrap: 'bg-amber-50/70 ring-amber-600/10', icon: 'text-amber-600', label: 'text-amber-700' },
+  success: { wrap: 'bg-emerald-50/70 ring-emerald-600/10', icon: 'text-emerald-600', label: 'text-emerald-700' },
+}
+
+function PolicyBands({ latestCode, minimumCode, className = '' }: { latestCode: number; minimumCode: number; className?: string }) {
+  const bands = buildPolicyBands(latestCode, minimumCode)
   return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-base font-semibold text-ink">{value}</dd>
-      {sub ? <dd className="text-xs text-slate-400">{sub}</dd> : null}
-    </div>
+    <ul className={`flex flex-col gap-2 ${className}`}>
+      {bands.map((band) => {
+        const styles = BAND_STYLES[band.tone]
+        const Icon = band.icon
+        return (
+          <li key={band.label} className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 ring-1 ring-inset ${styles.wrap}`}>
+            <Icon className={`mt-0.5 size-4 shrink-0 ${styles.icon}`} aria-hidden />
+            <p className="text-xs leading-relaxed text-slate-600">
+              <span className={`font-semibold ${styles.label}`}>{band.label}</span> {band.detail}
+            </p>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -146,12 +215,20 @@ function AppUpdateEditor({ editor, onClose }: { editor: EditorState | null; onCl
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  const minimumExceedsLatest = form.minimumVersionCode > form.latestVersionCode
+  const forcesAll = form.minimumVersionCode >= form.latestVersionCode && form.minimumVersionCode > 0
+  const forcesNobody = form.minimumVersionCode <= 0
+
   function save() {
     if (!editor) return
     setErrorText(null)
     const target = editor.isNew ? platform.trim().toUpperCase() : editor.platform
     if (!target) {
       setErrorText('Platform is required')
+      return
+    }
+    if (minimumExceedsLatest) {
+      setErrorText('The force-update floor cannot be higher than the latest version code.')
       return
     }
     mutation.mutate(
@@ -174,18 +251,25 @@ function AppUpdateEditor({ editor, onClose }: { editor: EditorState | null; onCl
           <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
-          <Button isLoading={mutation.isPending} disabled={!form.latestVersionName.trim() || !form.storeUrl.trim()} onClick={save}>
+          <Button
+            isLoading={mutation.isPending}
+            disabled={!form.latestVersionName.trim() || !form.storeUrl.trim() || minimumExceedsLatest}
+            onClick={save}
+          >
             Save
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
         {editor?.isNew ? (
           <TextField label="Platform" placeholder="ANDROID or IOS" value={platform} onChange={(event) => setPlatform(event.target.value)} />
         ) : null}
-        <TextField label="Latest version name" placeholder="1.1.15" value={form.latestVersionName} onChange={(event) => setField('latestVersionName', event.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4">
+          <legend className="px-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700">Latest version</legend>
+          <p className="-mt-1 text-xs text-slate-500">Everyone on an older build is offered a dismissible update automatically. Releasing a new version is as simple as bumping these.</p>
+          <TextField label="Version name shown to users" placeholder="1.1.15" value={form.latestVersionName} onChange={(event) => setField('latestVersionName', event.target.value)} />
           <TextField
             label="Latest version code"
             type="number"
@@ -193,21 +277,47 @@ function AppUpdateEditor({ editor, onClose }: { editor: EditorState | null; onCl
             value={String(form.latestVersionCode)}
             onChange={(event) => setField('latestVersionCode', Number(event.target.value) || 0)}
           />
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4">
+          <legend className="px-1.5 text-xs font-semibold uppercase tracking-wide text-red-700">Force-update floor</legend>
+          <p className="-mt-1 text-xs text-slate-500">Anyone on a build below this code is blocked and cannot use the app until they update. Leave at 0 to force no one.</p>
           <TextField
-            label="Minimum (force) code"
+            label="Force-update everyone below code"
             type="number"
             min={0}
             value={String(form.minimumVersionCode)}
             onChange={(event) => setField('minimumVersionCode', Number(event.target.value) || 0)}
           />
-        </div>
-        <button type="button" onClick={forceEveryone} className="cursor-pointer self-start text-xs font-medium text-red-600 hover:underline">
-          Force every older build to update (set minimum = latest)
-        </button>
+          <button type="button" onClick={forceEveryone} className="cursor-pointer self-start text-xs font-medium text-red-600 hover:underline">
+            Force every older build to update (set the floor to the latest code)
+          </button>
+        </fieldset>
+
         <TextField label="Store URL" placeholder="https://…" value={form.storeUrl} onChange={(event) => setField('storeUrl', event.target.value)} />
-        {form.minimumVersionCode > form.latestVersionCode ? (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">Minimum code cannot exceed the latest code.</p>
-        ) : null}
+
+        <div className="rounded-xl bg-slate-50 p-3.5">
+          <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">With these numbers</p>
+          {minimumExceedsLatest ? (
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-amber-700">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              The force-update floor ({formatNumber(form.minimumVersionCode)}) is above the latest code ({formatNumber(form.latestVersionCode)}). Lower it to continue.
+            </p>
+          ) : (
+            <>
+              <PolicyBands latestCode={form.latestVersionCode} minimumCode={form.minimumVersionCode} />
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-500">
+                <ArrowDown className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                {forcesAll
+                  ? 'Every build older than the latest is force-updated.'
+                  : forcesNobody
+                    ? 'No one is forced — older builds only see a dismissible prompt.'
+                    : 'Older builds get a dismissible prompt; only those below the floor are forced.'}
+              </p>
+            </>
+          )}
+        </div>
+
         {errorText ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
       </div>
     </Modal>

@@ -74,8 +74,93 @@ export interface UpdateStoreRequest {
   workingHours: string
 }
 
+export interface CreateStoreRequest {
+  name: string
+  address: string
+  contactInfo: string
+  category: string
+  workingHours: string
+}
+
 export const STAFF_ROLES = ['OWNER', 'STORE_MANAGER', 'CASHIER', 'STAFF'] as const
 export type StaffRole = (typeof STAFF_ROLES)[number]
+
+export interface CreateStaffRequest {
+  firstName: string
+  lastName: string
+  email: string
+  role: string
+}
+
+export interface CreatedStaffResponse {
+  staff: AdminStaff
+  temporaryPassword: string
+}
+
+export interface TemporaryPasswordResponse {
+  temporaryPassword: string
+}
+
+export interface UpdateCustomerRequest {
+  firstName: string
+  lastName: string
+  email: string
+  phoneNumber: string
+}
+
+export interface PointsAdjustmentRequest {
+  pointsDelta: number
+  reason: string
+}
+
+export interface PointsAdjustmentResponse {
+  organizationPoints: number
+  networkPoints: number
+  transactionId: string
+}
+
+export interface UpdateProgramRequest {
+  name: string
+}
+
+export interface AdminProgramResponseModel {
+  id: string
+  name: string
+  type: string
+  active: boolean
+}
+
+export interface UpdateCampaignRequest {
+  name: string
+  startDate: string
+  endDate: string
+  promotionValue: number
+}
+
+export interface AdminCampaignResponseModel {
+  id: string
+  name: string
+  promotionType: string
+  promotionValue: number
+  active: boolean
+  startDate: string
+  endDate: string
+}
+
+export interface VoidTransactionRequest {
+  reason: string
+}
+
+export interface AdminTransactionSummary {
+  id: string
+  customerId: string
+  transactionType: string
+  status: string
+  amount: number
+  pointsEarned: number
+  pointsRedeemed: number
+  occurredAt: string
+}
 
 export interface AdminProgram {
   id: string
