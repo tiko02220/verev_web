@@ -61,10 +61,10 @@ export function usePendingCardDesigns() {
 export function useDecideCardDesign() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ storeId, approve, reason }: { storeId: string; approve: boolean; reason?: string }) =>
+    mutationFn: ({ organizationId, approve, reason }: { organizationId: string; approve: boolean; reason?: string }) =>
       approve
-        ? api.post<Record<string, string>>('/v1/admin/moderation/card-designs/approve', {}, { storeId })
-        : api.post<Record<string, string>>('/v1/admin/moderation/card-designs/reject', { reason }, { storeId }),
+        ? api.post<Record<string, string>>('/v1/admin/moderation/card-designs/approve', {}, { organizationId })
+        : api.post<Record<string, string>>('/v1/admin/moderation/card-designs/reject', { reason }, { organizationId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-card-designs'] }),
   })
 }

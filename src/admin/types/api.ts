@@ -338,7 +338,6 @@ export interface ModerationPromotion {
 }
 
 export interface ModerationCardDesign {
-  storeId: string
   organizationId: string
   merchantName: string
   cardName: string

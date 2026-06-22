@@ -138,7 +138,7 @@ function CardDesignsQueue({ query }: QueueProps<ModerationCardDesign>) {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {rows.map((design) => (
-        <Card key={design.storeId} className="overflow-hidden">
+        <Card key={design.organizationId} className="overflow-hidden">
           <div className="p-5">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-ink">{design.merchantName}</p>
@@ -147,8 +147,8 @@ function CardDesignsQueue({ query }: QueueProps<ModerationCardDesign>) {
             <CardPreview design={design} />
           </div>
           <Actions
-            isPending={decide.isPending && decide.variables?.storeId === design.storeId}
-            onApprove={() => decide.mutate({ storeId: design.storeId, approve: true })}
+            isPending={decide.isPending && decide.variables?.organizationId === design.organizationId}
+            onApprove={() => decide.mutate({ organizationId: design.organizationId, approve: true })}
             onReject={() => setRejecting(design)}
           />
         </Card>
@@ -163,7 +163,7 @@ function CardDesignsQueue({ query }: QueueProps<ModerationCardDesign>) {
         isLoading={decide.isPending}
         onConfirm={(reason) => {
           if (!rejecting) return
-          decide.mutate({ storeId: rejecting.storeId, approve: false, reason: reason || undefined }, { onSuccess: () => setRejecting(null) })
+          decide.mutate({ organizationId: rejecting.organizationId, approve: false, reason: reason || undefined }, { onSuccess: () => setRejecting(null) })
         }}
         onClose={() => setRejecting(null)}
       />
