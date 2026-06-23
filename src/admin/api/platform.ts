@@ -33,6 +33,14 @@ export function useAuditLog(page: number) {
   })
 }
 
+export function useAuditEntry(id: string | null) {
+  return useQuery({
+    queryKey: ['platform-audit-entry', id],
+    queryFn: () => api.get<AuditEntry>('/v1/admin/audit/get', { id: id ?? '' }),
+    enabled: Boolean(id),
+  })
+}
+
 export function usePendingPromotions() {
   return useQuery({
     queryKey: ['moderation-promotions'],

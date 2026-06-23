@@ -3,16 +3,25 @@ import { api } from '../lib/apiClient'
 import type {
   AdminApproval,
   AdminCampaign,
+  AdminCampaignDetail,
+  AdminCampaignFullRequest,
   AdminCampaignResponseModel,
+  AdminCreateRewardRequest,
   AdminCustomer,
   AdminLedgerEntry,
   AdminProgram,
+  AdminProgramDetail,
   AdminProgramResponseModel,
+  AdminRewardDetail,
+  AdminRewardInventoryAdjustmentRequest,
   AdminRewardSummary,
   AdminStaff,
   AdminStore,
   AdminTransaction,
+  AdminTransactionDetail,
   AdminTransactionSummary,
+  AdminUpdateProgramConfigRequest,
+  AdminUpdateRewardRequest,
   CreateProgramRequest,
   CreateStaffRequest,
   CreateStoreRequest,
@@ -26,7 +35,6 @@ import type {
   PointsAdjustmentResponse,
   TemporaryPasswordResponse,
   UpdateAccessStateRequest,
-  UpdateCampaignRequest,
   UpdateCustomerRequest,
   UpdateProfileRequest,
   UpdateProgramRequest,
@@ -404,15 +412,6 @@ export function useSetCampaignActive(organizationId: string) {
   })
 }
 
-export function useUpdateCampaign(organizationId: string) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ campaignId, request }: { campaignId: string; request: UpdateCampaignRequest }) =>
-      api.put<AdminCampaignResponseModel>('/v1/admin/organizations/campaign', request, { organizationId, campaignId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-campaigns', organizationId] }),
-  })
-}
-
 export function useDeleteCampaign(organizationId: string) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -436,5 +435,94 @@ export function useVoidTransaction(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: ['merchant-customers', organizationId] })
       queryClient.invalidateQueries({ queryKey: ['merchant-overview', organizationId] })
     },
+  })
+}
+
+export function useMerchantTransactionDetail(organizationId: string, transactionId: string | null) {
+  return useQuery({
+    queryKey: ['merchant-transaction-detail', organizationId, transactionId],
+    queryFn: () => api.get<AdminTransactionDetail>('/v1/admin/organizations/transaction', { organizationId, transactionId: transactionId ?? '' }),
+    enabled: Boolean(transactionId),
+  })
+}
+
+export function useRewardDetail(organizationId: string, rewardId: string | null) {
+  return useQuery({
+    queryKey: ['merchant-reward-detail', organizationId, rewardId],
+    queryFn: () => api.get<AdminRewardDetail>('/v1/admin/organizations/reward/get', { organizationId, rewardId: rewardId ?? '' }),
+    enabled: Boolean(rewardId),
+  })
+}
+
+export function useCampaignDetail(organizationId: string, campaignId: string | null) {
+  return useQuery({
+    queryKey: ['merchant-campaign-detail', organizationId, campaignId],
+    queryFn: () => api.get<AdminCampaignDetail>('/v1/admin/organizations/campaign/get', { organizationId, campaignId: campaignId ?? '' }),
+    enabled: Boolean(campaignId),
+  })
+}
+
+export function useProgramDetail(organizationId: string, programId: string | null) {
+  return useQuery({
+    queryKey: ['merchant-program-detail', organizationId, programId],
+    queryFn: () => api.get<AdminProgramDetail>('/v1/admin/organizations/program/get', { organizationId, programId: programId ?? '' }),
+    enabled: Boolean(programId),
+  })
+}
+
+export function useCreateReward(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: AdminCreateRewardRequest) =>
+      api.post<AdminRewardSummary>('/v1/admin/organizations/reward/create', request, { organizationId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-rewards', organizationId] }),
+  })
+}
+
+export function useUpdateReward(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ rewardId, request }: { rewardId: string; request: AdminUpdateRewardRequest }) =>
+      api.put<AdminRewardSummary>('/v1/admin/organizations/reward', request, { organizationId, rewardId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-rewards', organizationId] }),
+  })
+}
+
+export function useAdjustRewardInventory(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ rewardId, request }: { rewardId: string; request: AdminRewardInventoryAdjustmentRequest }) =>
+      api.post<AdminRewardSummary>('/v1/admin/organizations/reward/inventory', request, { organizationId, rewardId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-rewards', organizationId] }),
+  })
+}
+
+export function useCreateCampaign(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: AdminCampaignFullRequest) =>
+      api.post<AdminCampaignResponseModel>('/v1/admin/organizations/campaign/create', request, { organizationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['merchant-campaigns', organizationId] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-overview', organizationId] })
+    },
+  })
+}
+
+export function useUpdateCampaignFull(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ campaignId, request }: { campaignId: string; request: AdminCampaignFullRequest }) =>
+      api.put<AdminCampaignResponseModel>('/v1/admin/organizations/campaign/full', request, { organizationId, campaignId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-campaigns', organizationId] }),
+  })
+}
+
+export function useUpdateProgramConfig(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ programId, request }: { programId: string; request: AdminUpdateProgramConfigRequest }) =>
+      api.put<AdminProgramResponseModel>('/v1/admin/organizations/program/config', request, { organizationId, programId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-programs', organizationId] }),
   })
 }

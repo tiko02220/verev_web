@@ -84,11 +84,26 @@ export function MerchantsPage() {
                     <tr
                       key={merchant.organizationId}
                       onClick={() => navigate(`/admin/merchants/${merchant.organizationId}`)}
-                      className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          navigate(`/admin/merchants/${merchant.organizationId}`)
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
                     >
                       <td className="px-5 py-3.5">
-                        <span className="block font-medium text-ink">{merchant.displayName}</span>
-                        <span className="mono block text-xs text-slate-400">{merchant.slug}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-sm font-semibold text-brand-dark ring-1 ring-inset ring-brand-ring/60">
+                            {(merchant.displayName.charAt(0) || '?').toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="block truncate font-medium text-ink">{merchant.displayName}</span>
+                            <span className="mono block truncate text-xs text-slate-400">{merchant.slug}</span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         {merchant.accessState !== 'ACTIVE' ? (
@@ -100,7 +115,7 @@ export function MerchantsPage() {
                       <td className="mono px-5 py-3.5 text-right text-slate-700">{formatNumber(merchant.storeCount)}</td>
                       <td className="mono px-5 py-3.5 text-right text-slate-700">{formatNumber(merchant.staffCount)}</td>
                       <td className="mono px-5 py-3.5 text-right text-slate-700">{formatNumber(merchant.customerCount)}</td>
-                      <td className="px-5 py-3.5 text-slate-600">{merchant.planCode ?? '—'}</td>
+                      <td className="px-5 py-3.5 text-slate-600">{merchant.planCode ? humanize(merchant.planCode) : '—'}</td>
                       <td className="px-5 py-3.5 text-slate-500">{formatDate(merchant.createdAt)}</td>
                     </tr>
                   ))}

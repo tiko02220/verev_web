@@ -139,6 +139,8 @@ export interface AdminProgramResponseModel {
   name: string
   type: string
   active: boolean
+  scheduleStatus: string
+  isCurrentlyActive: boolean
 }
 
 export const PROGRAM_TYPES = ['DIGITAL_STAMP', 'TIER', 'PURCHASE_FREQUENCY', 'REFERRAL'] as const
@@ -172,7 +174,7 @@ export interface CreateProgramRequest {
 
 export interface AdminRewardSummary {
   id: string
-  storeId: string
+  storeId: string | null
   name: string
   description: string
   pointsRequired: number
@@ -182,13 +184,53 @@ export interface AdminRewardSummary {
   inventoryTracked: boolean
   availableQuantity: number
   imageUri: string
+  expirationDate: string
+  usageLimit: number
+  status: string
 }
 
-export interface UpdateCampaignRequest {
+export interface AdminCreateRewardRequest {
+  scope: string
+  storeId: string | null
   name: string
-  startDate: string
-  endDate: string
-  promotionValue: number
+  description: string
+  pointsRequired: number
+  rewardType: string
+  catalogType: string
+  imageUri: string | null
+  expirationDate: string | null
+  usageLimit: number
+  availableQuantity: number
+  activeStatus: boolean
+  couponCode: string | null
+  couponBenefitType: string | null
+  couponDiscountPercent: number | null
+  couponBonusPoints: number | null
+  couponRewardId: string | null
+}
+
+export interface AdminUpdateRewardRequest {
+  storeId: string | null
+  name: string
+  description: string
+  pointsRequired: number
+  rewardType: string
+  catalogType: string
+  imageUri: string | null
+  expirationDate: string | null
+  usageLimit: number
+  availableQuantity: number
+  activeStatus: boolean
+  couponCode: string | null
+  couponBenefitType: string | null
+  couponDiscountPercent: number | null
+  couponBonusPoints: number | null
+  couponRewardId: string | null
+  expectedVersion: number
+}
+
+export interface AdminRewardInventoryAdjustmentRequest {
+  delta: number
 }
 
 export interface AdminCampaignResponseModel {
@@ -197,8 +239,67 @@ export interface AdminCampaignResponseModel {
   promotionType: string
   promotionValue: number
   active: boolean
+  giveawayStatus: string
+  moderationStatus: string
   startDate: string
   endDate: string
+}
+
+export interface AdminCampaignFullRequest {
+  scope: string
+  storeId: string | null
+  expectedVersion: number
+  name: string
+  description: string
+  imageUri: string | null
+  startDate: string
+  endDate: string
+  promotionType: string
+  promotionValue: number
+  minimumPurchaseAmount: number
+  usageLimit: number
+  promoCode: string | null
+  visibility: string
+  boostLevel: string | null
+  paymentFlowEnabled: boolean
+  active: boolean
+  segments: string[]
+  targetSegment: string | null
+  targetDescription: string | null
+  sendMode: string
+  scheduledDate: string | null
+  expirationEnabled: boolean
+  expirationDate: string | null
+  giveawayType: string | null
+  bonusPointsAmount: number | null
+  discountPercent: number | null
+  rewardId: string | null
+  audienceAll: boolean
+  audienceGender: string
+  audienceAgeMin: number | null
+  audienceAgeMax: number | null
+  audienceTierName: string | null
+}
+
+export interface AdminUpdateProgramConfigRequest {
+  expectedVersion: number
+  name: string
+  type: string
+  scope: string
+  active: boolean
+  tierSilverThreshold: number
+  tierGoldThreshold: number
+  tierVipThreshold: number
+  tierThresholdBasis: string
+  checkInVisitsRequired: number
+  checkInRewardPoints: number
+  checkInRewardName: string
+  purchaseFrequencyCount: number
+  purchaseFrequencyWindowDays: number
+  purchaseFrequencyRewardPoints: number
+  referralReferrerRewardPoints: number
+  referralRefereeRewardPoints: number
+  storeId: string | null
 }
 
 export interface VoidTransactionRequest {
@@ -221,6 +322,8 @@ export interface AdminProgram {
   name: string
   type: string
   active: boolean
+  scheduleStatus: string
+  isCurrentlyActive: boolean
   createdAt: string
 }
 
@@ -229,10 +332,12 @@ export interface AdminCampaign {
   name: string
   promotionType: string
   promotionValue: number
+  giveawayType: string
   active: boolean
+  giveawayStatus: string
+  moderationStatus: string
   startDate: string
   endDate: string
-  giveawayType: string
 }
 
 export interface AdminTransaction {
@@ -244,6 +349,128 @@ export interface AdminTransaction {
   pointsEarned: number
   pointsRedeemed: number
   occurredAt: string
+}
+
+export interface AdminTransactionItem {
+  id: string
+  sku: string
+  title: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface AdminTransactionDetail {
+  id: string
+  organizationId: string
+  storeId: string | null
+  storeName: string
+  customerId: string
+  customerDisplayName: string
+  staffUserId: string
+  staffDisplayName: string
+  transactionType: string
+  status: string
+  amount: number
+  currencyCode: string
+  summary: string
+  pointsEarned: number
+  engagementPointsEarned: number
+  pointsRedeemed: number
+  originalTransactionId: string | null
+  occurredAt: string
+  completedAt: string | null
+  items: AdminTransactionItem[]
+}
+
+export interface AdminRewardDetail {
+  id: string
+  storeId: string | null
+  scope: string
+  name: string
+  description: string
+  pointsRequired: number
+  rewardType: string
+  catalogType: string
+  imageUri: string
+  expirationDate: string
+  usageLimit: number
+  inventoryTracked: boolean
+  availableQuantity: number
+  activeStatus: boolean
+  status: string
+  couponCode: string | null
+  couponBenefitType: string | null
+  couponDiscountPercent: number | null
+  couponBonusPoints: number | null
+  couponRewardId: string | null
+  couponRewardName: string
+  version: number
+}
+
+export interface AdminCampaignDetail {
+  id: string
+  storeId: string | null
+  scope: string
+  name: string
+  description: string
+  imageUri: string
+  startDate: string
+  endDate: string
+  promotionType: string
+  promotionValue: number
+  minimumPurchaseAmount: number
+  usageLimit: number
+  promoCode: string
+  visibility: string
+  boostLevel: string
+  paymentFlowEnabled: boolean
+  active: boolean
+  segments: string[]
+  targetSegment: string
+  targetDescription: string
+  sendMode: string
+  scheduledDate: string | null
+  expirationEnabled: boolean
+  expirationDate: string | null
+  giveawayType: string
+  bonusPointsAmount: number | null
+  discountPercent: number | null
+  rewardId: string | null
+  rewardName: string
+  rewardCatalogType: string
+  audienceAll: boolean
+  audienceGender: string
+  audienceAgeMin: number | null
+  audienceAgeMax: number | null
+  audienceTierName: string
+  giveawayStatus: string
+  moderationStatus: string
+  version: number
+}
+
+export interface AdminProgramDetail {
+  id: string
+  name: string
+  type: string
+  scope: string
+  storeId: string | null
+  active: boolean
+  scheduleStatus: string
+  isCurrentlyActive: boolean
+  tierThresholdBasis: string
+  tierSilverThreshold: number
+  tierGoldThreshold: number
+  tierVipThreshold: number
+  checkInVisitsRequired: number
+  checkInRewardPoints: number
+  checkInRewardName: string
+  purchaseFrequencyCount: number
+  purchaseFrequencyWindowDays: number
+  purchaseFrequencyRewardPoints: number
+  referralReferrerRewardPoints: number
+  referralRefereeRewardPoints: number
+  version: number
 }
 
 export interface AdminLedgerEntry {
@@ -396,11 +623,15 @@ export interface AdminApproval {
 export interface AuditEntry {
   id: string
   actorType: string
+  actorId: string
+  actorName: string
   action: string
   entityType: string
   entityId: string
   organizationId: string | null
   reasonText: string
+  beforeJson: string
+  afterJson: string
   createdAt: string
 }
 

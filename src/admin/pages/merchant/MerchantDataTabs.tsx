@@ -1,6 +1,24 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Ban, BookOpen, ChevronRight, CreditCard, Gift, Megaphone, Pencil, Plus, Power, Receipt, ShieldCheck, Tag, Trash2 } from 'lucide-react'
+import {
+  Ban,
+  BookOpen,
+  Boxes,
+  Check,
+  ChevronRight,
+  Copy,
+  CreditCard,
+  Gift,
+  Megaphone,
+  Pencil,
+  Plus,
+  Power,
+  Receipt,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tag,
+  Trash2,
+} from 'lucide-react'
 import { useAdminAuth } from '../../auth/AdminAuthContext'
 import { can } from '../../auth/permissions'
 import {
@@ -15,12 +33,12 @@ import {
   useMerchantLedger,
   useMerchantPrograms,
   useMerchantRewards,
+  useMerchantTransactionDetail,
   useMerchantTransactions,
   useRenameProgram,
   useSetCampaignActive,
   useSetProgramActive,
   useSetRewardActive,
-  useUpdateCampaign,
   useVoidTransaction,
 } from '../../api/merchants'
 import { ApiError } from '../../lib/apiClient'
@@ -41,15 +59,69 @@ import type {
   AdminTransaction,
   BillingInvoice,
   CreateProgramRequest,
-  UpdateCampaignRequest,
 } from '../../types/api'
+import { GiveawayFormDialog, ProgramConfigDialog, RewardFormDialog, RewardInventoryDialog } from './MerchantDataForms'
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
 }
 
-function activeTone(active: boolean): PillTone {
-  return active ? 'success' : 'neutral'
+function programScheduleTone(status: string): PillTone {
+  switch (status) {
+    case 'LIVE':
+      return 'success'
+    case 'SCHEDULED':
+      return 'info'
+    case 'PAUSED':
+      return 'warning'
+    case 'COMPLETED':
+      return 'neutral'
+    default:
+      return 'neutral'
+  }
+}
+
+function rewardStatusTone(status: string): PillTone {
+  switch (status) {
+    case 'ACTIVE':
+      return 'success'
+    case 'DISABLED':
+      return 'neutral'
+    case 'EXPIRED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+function giveawayStatusTone(status: string): PillTone {
+  switch (status) {
+    case 'READY':
+    case 'SENT':
+      return 'success'
+    case 'SCHEDULED':
+      return 'info'
+    case 'COMPLETED':
+      return 'neutral'
+    case 'EXPIRED':
+    case 'DISABLED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+function moderationTone(status: string): PillTone {
+  switch (status) {
+    case 'APPROVED':
+      return 'success'
+    case 'PENDING':
+      return 'warning'
+    case 'REJECTED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
 }
 
 function transactionTone(status: string): PillTone {
@@ -64,6 +136,45 @@ function transactionTone(status: string): PillTone {
     default:
       return 'neutral'
   }
+}
+
+function approvalTone(status: string): PillTone {
+  switch (status) {
+    case 'APPROVED':
+      return 'success'
+    case 'PENDING':
+      return 'warning'
+    case 'REJECTED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+const GIVEAWAY_LIFECYCLE_LOCKED = new Set(['SENT', 'COMPLETED', 'EXPIRED'])
+
+function CopyId({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  if (!value) return <span className="text-sm text-slate-400">—</span>
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <button type="button" onClick={copy} title="Copy to clipboard" className="group inline-flex items-center gap-1.5 text-left">
+      <span className="mono text-xs text-slate-700">{value}</span>
+      {copied ? (
+        <Check className="size-3.5 shrink-0 text-emerald-600" aria-hidden />
+      ) : (
+        <Copy className="size-3.5 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" aria-hidden />
+      )}
+    </button>
+  )
 }
 
 interface GateProps {
@@ -84,13 +195,22 @@ function TabGate({ isLoading, isError, error, isEmpty, emptyIcon, emptyTitle, on
   return <>{children}</>
 }
 
-function DataTabHeader({ title, action }: { title: string; action: ReactNode }) {
+function DataTabHeader({ title, count, action }: { title: string; count?: number; action?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        {count !== undefined ? (
+          <span className="mono rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{formatNumber(count)}</span>
+        ) : null}
+      </div>
       {action}
     </div>
   )
+}
+
+function chevronColumn<T>(): SimpleColumn<T> {
+  return { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> }
 }
 
 export function ProgramsTab({ merchantId }: { merchantId: string }) {
@@ -100,6 +220,7 @@ export function ProgramsTab({ merchantId }: { merchantId: string }) {
   const setActive = useSetProgramActive(merchantId)
   const deleteProgram = useDeleteProgram(merchantId)
   const [renaming, setRenaming] = useState<AdminProgram | null>(null)
+  const [configuring, setConfiguring] = useState<AdminProgram | null>(null)
   const [deleting, setDeleting] = useState<AdminProgram | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<AdminProgram | null>(null)
@@ -109,86 +230,140 @@ export function ProgramsTab({ merchantId }: { merchantId: string }) {
     { header: 'Name', render: (program) => <span className="font-medium text-slate-900">{program.name}</span> },
     { header: 'Type', render: (program) => <span className="text-slate-600">{humanize(program.type)}</span> },
     { header: 'Created', render: (program) => <span className="text-slate-500">{formatDate(program.createdAt)}</span> },
-    { header: 'Status', render: (program) => <StatusPill tone={activeTone(program.active)}>{program.active ? 'Active' : 'Inactive'}</StatusPill> },
-    { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> },
+    {
+      header: 'Schedule',
+      render: (program) => <StatusPill tone={programScheduleTone(program.scheduleStatus)}>{humanize(program.scheduleStatus)}</StatusPill>,
+    },
+    {
+      header: 'Enabled',
+      render: (program) => <StatusPill tone={program.active ? 'success' : 'neutral'}>{program.active ? 'On' : 'Off'}</StatusPill>,
+    },
+    chevronColumn<AdminProgram>(),
   ]
-  const addButton = canManage ? (
-    <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
-      Add program
-    </Button>
-  ) : null
   return (
     <div className="space-y-4">
-      <DataTabHeader title="Programs" action={addButton} />
-      <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0} emptyIcon={<Tag className="size-7" aria-hidden />} emptyTitle="No programs" onRetry={() => refetch()}>
-      <SimpleTable<AdminProgram> rows={rows} getKey={(program) => program.id} columns={columns} onRowClick={setViewing} />
-      <DetailDrawer
-        open={viewing !== null}
-        onClose={() => setViewing(null)}
-        title={viewing?.name ?? ''}
-        subtitle={viewing ? humanize(viewing.type) : undefined}
-        status={viewing ? <StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill> : undefined}
-        actions={
-          viewing && canManage ? (
-            <>
-              <Button
-                variant="secondary"
-                icon={<Trash2 className="size-4" aria-hidden />}
-                className="text-red-600"
-                onClick={() => { setDeleteError(null); setDeleting(viewing); setViewing(null) }}
-              >
-                Delete
-              </Button>
-              <Button
-                variant="secondary"
-                icon={<Power className="size-4" aria-hidden />}
-                className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
-                isLoading={setActive.isPending}
-                onClick={() => setActive.mutate({ programId: viewing.id, active: !viewing.active })}
-              >
-                {viewing.active ? 'Disable' : 'Enable'}
-              </Button>
-              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setRenaming(viewing); setViewing(null) }}>
-                Rename
-              </Button>
-            </>
+      <DataTabHeader
+        title="Programs"
+        count={rows.length}
+        action={
+          canManage ? (
+            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
+              Add program
+            </Button>
           ) : undefined
         }
-      >
-        {viewing ? (
-          <DetailSection title="Program">
-            <DetailRow label="Name" value={viewing.name} />
-            <DetailRow label="Type" value={humanize(viewing.type)} />
-            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
-            <DetailRow label="Created" value={formatDate(viewing.createdAt)} />
-          </DetailSection>
-        ) : null}
-      </DetailDrawer>
-      <ProgramRenameDialog merchantId={merchantId} program={renaming} onClose={() => setRenaming(null)} />
-      <ConfirmDialog
-        open={deleting !== null}
-        title="Delete program"
-        description={
-          <div className="flex flex-col gap-2">
-            <span>
-              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> program. Customer points already earned remain in the ledger, but
-              this program stops issuing or redeeming. This action cannot be undone.
-            </span>
-            {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
-          </div>
-        }
-        confirmLabel="Delete program"
-        tone="danger"
-        isLoading={deleteProgram.isPending}
-        onConfirm={() => {
-          if (!deleting) return
-          setDeleteError(null)
-          deleteProgram.mutate({ programId: deleting.id }, { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) })
-        }}
-        onClose={() => setDeleting(null)}
       />
+      <TabGate
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        isEmpty={rows.length === 0}
+        emptyIcon={<Tag className="size-7" aria-hidden />}
+        emptyTitle="No programs"
+        onRetry={() => refetch()}
+      >
+        <SimpleTable<AdminProgram> rows={rows} getKey={(program) => program.id} columns={columns} onRowClick={setViewing} />
+        <DetailDrawer
+          open={viewing !== null}
+          onClose={() => setViewing(null)}
+          title={viewing?.name ?? ''}
+          subtitle={viewing ? humanize(viewing.type) : undefined}
+          status={
+            viewing ? (
+              <>
+                <StatusPill tone={programScheduleTone(viewing.scheduleStatus)}>{humanize(viewing.scheduleStatus)}</StatusPill>
+                <StatusPill tone={viewing.active ? 'success' : 'neutral'}>{viewing.active ? 'Enabled' : 'Disabled'}</StatusPill>
+              </>
+            ) : undefined
+          }
+          actions={
+            viewing && canManage ? (
+              <>
+                <Button
+                  variant="secondary"
+                  icon={<Trash2 className="size-4" aria-hidden />}
+                  className="text-red-600"
+                  onClick={() => {
+                    setDeleteError(null)
+                    setDeleting(viewing)
+                    setViewing(null)
+                  }}
+                >
+                  Delete
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={<Power className="size-4" aria-hidden />}
+                  className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
+                  isLoading={setActive.isPending}
+                  onClick={() => setActive.mutate({ programId: viewing.id, active: !viewing.active })}
+                >
+                  {viewing.active ? 'Disable' : 'Enable'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={<SlidersHorizontal className="size-4" aria-hidden />}
+                  onClick={() => {
+                    setConfiguring(viewing)
+                    setViewing(null)
+                  }}
+                >
+                  Configure
+                </Button>
+                <Button
+                  icon={<Pencil className="size-4" aria-hidden />}
+                  onClick={() => {
+                    setRenaming(viewing)
+                    setViewing(null)
+                  }}
+                >
+                  Rename
+                </Button>
+              </>
+            ) : undefined
+          }
+        >
+          {viewing ? (
+            <DetailSection title="Program">
+              <DetailRow label="Name" value={viewing.name} />
+              <DetailRow label="Type" value={humanize(viewing.type)} />
+              <DetailRow label="Schedule" value={humanize(viewing.scheduleStatus)} />
+              <DetailRow label="Currently active" value={viewing.isCurrentlyActive ? 'Yes' : 'No'} />
+              <DetailRow label="Enabled" value={viewing.active ? 'Yes' : 'No'} />
+              <DetailRow label="Created" value={formatDate(viewing.createdAt)} />
+              <DetailRow label="Program ID" value={<CopyId value={viewing.id} />} />
+            </DetailSection>
+          ) : null}
+        </DetailDrawer>
+        <ProgramRenameDialog merchantId={merchantId} program={renaming} onClose={() => setRenaming(null)} />
+        <ConfirmDialog
+          open={deleting !== null}
+          title="Delete program"
+          description={
+            <div className="flex flex-col gap-2">
+              <span>
+                Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> program. Customer points already earned remain in the ledger, but
+                this program stops issuing or redeeming. This action cannot be undone.
+              </span>
+              {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
+            </div>
+          }
+          confirmLabel="Delete program"
+          tone="danger"
+          isLoading={deleteProgram.isPending}
+          onConfirm={() => {
+            if (!deleting) return
+            setDeleteError(null)
+            deleteProgram.mutate(
+              { programId: deleting.id },
+              { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) },
+            )
+          }}
+          onClose={() => setDeleting(null)}
+        />
       </TabGate>
       <ProgramCreateDialog merchantId={merchantId} open={creating} onClose={() => setCreating(false)} />
+      <ProgramConfigDialog merchantId={merchantId} program={configuring} onClose={() => setConfiguring(null)} />
     </div>
   )
 }
@@ -225,6 +400,25 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
         onChange(Number.isInteger(parsed) ? parsed : 0)
       }}
     />
+  )
+}
+
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {humanize(option)}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -318,25 +512,6 @@ function ProgramCreateDialog({ merchantId, open, onClose }: { merchantId: string
   )
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {humanize(option)}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
 function ProgramRenameDialog({ merchantId, program, onClose }: { merchantId: string; program: AdminProgram | null; onClose: () => void }) {
   const mutation = useRenameProgram(merchantId)
   const [name, setName] = useState('')
@@ -395,19 +570,58 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
   const [deleting, setDeleting] = useState<AdminRewardSummary | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<AdminRewardSummary | null>(null)
+  const [editing, setEditing] = useState<AdminRewardSummary | null>(null)
+  const [adjusting, setAdjusting] = useState<AdminRewardSummary | null>(null)
+  const [creating, setCreating] = useState(false)
   const rows = data ?? []
   const columns: SimpleColumn<AdminRewardSummary>[] = [
-    { header: 'Name', render: (reward) => <span className="font-medium text-slate-900">{reward.name}</span> },
+    {
+      header: 'Reward',
+      render: (reward) => (
+        <div className="flex items-center gap-3">
+          {reward.imageUri ? (
+            <img src={reward.imageUri} alt="" className="size-9 shrink-0 rounded-lg border border-slate-200 object-cover" />
+          ) : (
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+              <Gift className="size-4" aria-hidden />
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-medium text-slate-900">{reward.name}</p>
+            <p className="text-xs text-slate-400">{humanize(reward.catalogType)}</p>
+          </div>
+        </div>
+      ),
+    },
     { header: 'Type', render: (reward) => <span className="text-slate-600">{humanize(reward.rewardType)}</span> },
-    { header: 'Points required', align: 'right', render: (reward) => <span className="mono text-slate-700">{formatNumber(reward.pointsRequired)}</span> },
+    { header: 'Points', align: 'right', render: (reward) => <span className="mono text-slate-700">{formatNumber(reward.pointsRequired)}</span> },
     { header: 'Inventory', render: (reward) => <span className="text-slate-600">{rewardInventoryLabel(reward)}</span> },
-    { header: 'Status', render: (reward) => <StatusPill tone={activeTone(reward.activeStatus)}>{reward.activeStatus ? 'Active' : 'Inactive'}</StatusPill> },
-    { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> },
+    { header: 'Expires', render: (reward) => <span className="text-slate-500">{reward.expirationDate ? formatDate(reward.expirationDate) : 'Never'}</span> },
+    { header: 'Status', render: (reward) => <StatusPill tone={rewardStatusTone(reward.status)}>{humanize(reward.status)}</StatusPill> },
+    chevronColumn<AdminRewardSummary>(),
   ]
   return (
     <div className="space-y-4">
-      <DataTabHeader title="Rewards" action={undefined} />
-      <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0} emptyIcon={<Gift className="size-7" aria-hidden />} emptyTitle="No rewards" onRetry={() => refetch()}>
+      <DataTabHeader
+        title="Rewards"
+        count={rows.length}
+        action={
+          canManage ? (
+            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
+              Add reward
+            </Button>
+          ) : undefined
+        }
+      />
+      <TabGate
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        isEmpty={rows.length === 0}
+        emptyIcon={<Gift className="size-7" aria-hidden />}
+        emptyTitle="No rewards"
+        onRetry={() => refetch()}
+      >
         <SimpleTable<AdminRewardSummary> rows={rows} getKey={(reward) => reward.id} columns={columns} onRowClick={setViewing} />
       </TabGate>
       <DetailDrawer
@@ -415,7 +629,7 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
         onClose={() => setViewing(null)}
         title={viewing?.name ?? ''}
         subtitle={viewing ? humanize(viewing.rewardType) : undefined}
-        status={viewing ? <StatusPill tone={activeTone(viewing.activeStatus)}>{viewing.activeStatus ? 'Active' : 'Inactive'}</StatusPill> : undefined}
+        status={viewing ? <StatusPill tone={rewardStatusTone(viewing.status)}>{humanize(viewing.status)}</StatusPill> : undefined}
         actions={
           viewing && canManage ? (
             <>
@@ -423,7 +637,11 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
                 variant="secondary"
                 icon={<Trash2 className="size-4" aria-hidden />}
                 className="text-red-600"
-                onClick={() => { setDeleteError(null); setDeleting(viewing); setViewing(null) }}
+                onClick={() => {
+                  setDeleteError(null)
+                  setDeleting(viewing)
+                  setViewing(null)
+                }}
               >
                 Delete
               </Button>
@@ -436,21 +654,50 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
               >
                 {viewing.activeStatus ? 'Disable' : 'Enable'}
               </Button>
+              <Button
+                variant="secondary"
+                icon={<Boxes className="size-4" aria-hidden />}
+                onClick={() => {
+                  setAdjusting(viewing)
+                  setViewing(null)
+                }}
+              >
+                Inventory
+              </Button>
+              <Button
+                icon={<Pencil className="size-4" aria-hidden />}
+                onClick={() => {
+                  setEditing(viewing)
+                  setViewing(null)
+                }}
+              >
+                Edit
+              </Button>
             </>
           ) : undefined
         }
       >
         {viewing ? (
-          <DetailSection title="Reward">
-            <DetailRow label="Name" value={viewing.name} />
-            <DetailRow label="Description" value={viewing.description} />
-            <DetailRow label="Type" value={humanize(viewing.rewardType)} />
-            <DetailRow label="Catalog" value={humanize(viewing.catalogType)} />
-            <DetailRow label="Points required" value={<span className="mono">{formatNumber(viewing.pointsRequired)}</span>} />
-            <DetailRow label="Inventory tracked" value={viewing.inventoryTracked ? 'Yes' : 'No'} />
-            <DetailRow label="Available" value={viewing.inventoryTracked ? <span className="mono">{formatNumber(viewing.availableQuantity)}</span> : 'Unlimited'} />
-            <DetailRow label="Status" value={viewing.activeStatus ? 'Active' : 'Inactive'} />
-          </DetailSection>
+          <>
+            {viewing.imageUri ? (
+              <img src={viewing.imageUri} alt={viewing.name} className="h-40 w-full rounded-xl border border-slate-200 object-cover" />
+            ) : null}
+            <DetailSection title="Reward">
+              <DetailRow label="Name" value={viewing.name} />
+              <DetailRow label="Description" value={viewing.description} />
+              <DetailRow label="Type" value={humanize(viewing.rewardType)} />
+              <DetailRow label="Catalog" value={humanize(viewing.catalogType)} />
+              <DetailRow label="Points required" value={<span className="mono">{formatNumber(viewing.pointsRequired)}</span>} />
+              <DetailRow label="Usage limit" value={<span className="mono">{formatNumber(viewing.usageLimit)}</span>} />
+              <DetailRow label="Inventory tracked" value={viewing.inventoryTracked ? 'Yes' : 'No'} />
+              <DetailRow label="Available" value={viewing.inventoryTracked ? <span className="mono">{formatNumber(viewing.availableQuantity)}</span> : 'Unlimited'} />
+              <DetailRow label="Expires" value={viewing.expirationDate ? formatDate(viewing.expirationDate) : 'Never'} />
+              <DetailRow label="Status" value={humanize(viewing.status)} />
+              <DetailRow label="Scope" value={viewing.storeId ? 'Branch' : 'Global'} />
+              {viewing.storeId ? <DetailRow label="Branch ID" value={<CopyId value={viewing.storeId} />} /> : null}
+              <DetailRow label="Reward ID" value={<CopyId value={viewing.id} />} />
+            </DetailSection>
+          </>
         ) : null}
       </DetailDrawer>
       <ConfirmDialog
@@ -471,10 +718,16 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
         onConfirm={() => {
           if (!deleting) return
           setDeleteError(null)
-          deleteReward.mutate({ rewardId: deleting.id }, { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) })
+          deleteReward.mutate(
+            { rewardId: deleting.id },
+            { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) },
+          )
         }}
         onClose={() => setDeleting(null)}
       />
+      <RewardFormDialog merchantId={merchantId} open={creating} reward={null} onClose={() => setCreating(false)} />
+      <RewardFormDialog merchantId={merchantId} open={editing !== null} reward={editing} onClose={() => setEditing(null)} />
+      <RewardInventoryDialog merchantId={merchantId} reward={adjusting} onClose={() => setAdjusting(null)} />
     </div>
   )
 }
@@ -489,60 +742,53 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
   const [deleting, setDeleting] = useState<AdminCampaign | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<AdminCampaign | null>(null)
-  const [giveawaysOnly, setGiveawaysOnly] = useState(false)
-  const allRows = data ?? []
-  const rows = giveawaysOnly ? allRows.filter((campaign) => campaign.giveawayType.length > 0) : allRows
+  const [creating, setCreating] = useState(false)
+  const rows = data ?? []
   const columns: SimpleColumn<AdminCampaign>[] = [
-    {
-      header: 'Name',
-      render: (campaign) => (
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-slate-900">{campaign.name}</span>
-          {campaign.giveawayType.length > 0 ? <StatusPill tone="info">Giveaway</StatusPill> : null}
-        </div>
-      ),
-    },
-    { header: 'Promotion', render: (campaign) => <span className="text-slate-600">{humanize(campaign.promotionType)}</span> },
-    { header: 'Value', render: (campaign) => <span className="mono text-slate-700">{formatNumber(campaign.promotionValue)}</span> },
+    { header: 'Name', render: (campaign) => <span className="font-medium text-slate-900">{campaign.name}</span> },
+    { header: 'Reward', render: (campaign) => <span className="text-slate-600">{humanize(campaign.giveawayType || campaign.promotionType)}</span> },
+    { header: 'Value', align: 'right', render: (campaign) => <span className="mono text-slate-700">{formatNumber(campaign.promotionValue)}</span> },
     { header: 'Window', render: (campaign) => <span className="text-slate-500">{`${formatDate(campaign.startDate)} → ${formatDate(campaign.endDate)}`}</span> },
-    { header: 'Status', render: (campaign) => <StatusPill tone={activeTone(campaign.active)}>{campaign.active ? 'Active' : 'Inactive'}</StatusPill> },
-    { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> },
+    {
+      header: 'Status',
+      render: (campaign) => <StatusPill tone={giveawayStatusTone(campaign.giveawayStatus)}>{humanize(campaign.giveawayStatus)}</StatusPill>,
+    },
+    chevronColumn<AdminCampaign>(),
   ]
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Promotions</h2>
-        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          {[
-            { key: false, label: 'All' },
-            { key: true, label: 'Giveaways' },
-          ].map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              onClick={() => setGiveawaysOnly(option.key)}
-              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                giveawaysOnly === option.key ? 'bg-brand-soft text-brand-dark shadow-sm' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0} emptyIcon={<Megaphone className="size-7" aria-hidden />} emptyTitle={giveawaysOnly ? 'No giveaways' : 'No promotions'} onRetry={() => refetch()}>
+      <DataTabHeader
+        title="Giveaways"
+        count={rows.length}
+        action={
+          canManage ? (
+            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
+              Add giveaway
+            </Button>
+          ) : undefined
+        }
+      />
+      <TabGate
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        isEmpty={rows.length === 0}
+        emptyIcon={<Megaphone className="size-7" aria-hidden />}
+        emptyTitle="No giveaways"
+        onRetry={() => refetch()}
+      >
         <SimpleTable<AdminCampaign> rows={rows} getKey={(campaign) => campaign.id} columns={columns} onRowClick={setViewing} />
       </TabGate>
       <DetailDrawer
         open={viewing !== null}
         onClose={() => setViewing(null)}
         title={viewing?.name ?? ''}
-        subtitle={viewing ? humanize(viewing.promotionType) : undefined}
+        subtitle={viewing ? humanize(viewing.giveawayType || viewing.promotionType) : undefined}
         status={
           viewing ? (
             <>
-              <StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill>
-              {viewing.giveawayType.length > 0 ? <StatusPill tone="info">Giveaway</StatusPill> : null}
+              <StatusPill tone={giveawayStatusTone(viewing.giveawayStatus)}>{humanize(viewing.giveawayStatus)}</StatusPill>
+              <StatusPill tone={moderationTone(viewing.moderationStatus)}>{humanize(viewing.moderationStatus)}</StatusPill>
             </>
           ) : undefined
         }
@@ -553,20 +799,32 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
                 variant="secondary"
                 icon={<Trash2 className="size-4" aria-hidden />}
                 className="text-red-600"
-                onClick={() => { setDeleteError(null); setDeleting(viewing); setViewing(null) }}
+                onClick={() => {
+                  setDeleteError(null)
+                  setDeleting(viewing)
+                  setViewing(null)
+                }}
               >
                 Delete
               </Button>
+              {GIVEAWAY_LIFECYCLE_LOCKED.has(viewing.giveawayStatus) ? null : (
+                <Button
+                  variant="secondary"
+                  icon={<Power className="size-4" aria-hidden />}
+                  className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
+                  isLoading={setActive.isPending}
+                  onClick={() => setActive.mutate({ campaignId: viewing.id, active: !viewing.active })}
+                >
+                  {viewing.active ? 'Disable' : 'Enable'}
+                </Button>
+              )}
               <Button
-                variant="secondary"
-                icon={<Power className="size-4" aria-hidden />}
-                className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
-                isLoading={setActive.isPending}
-                onClick={() => setActive.mutate({ campaignId: viewing.id, active: !viewing.active })}
+                icon={<Pencil className="size-4" aria-hidden />}
+                onClick={() => {
+                  setEditing(viewing)
+                  setViewing(null)
+                }}
               >
-                {viewing.active ? 'Disable' : 'Enable'}
-              </Button>
-              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditing(viewing); setViewing(null) }}>
                 Edit
               </Button>
             </>
@@ -574,117 +832,48 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
         }
       >
         {viewing ? (
-          <DetailSection title="Promotion">
+          <DetailSection title="Giveaway">
             <DetailRow label="Name" value={viewing.name} />
+            <DetailRow label="Giveaway type" value={humanize(viewing.giveawayType || '—')} />
             <DetailRow label="Promotion type" value={humanize(viewing.promotionType)} />
-            {viewing.giveawayType.length > 0 ? <DetailRow label="Giveaway type" value={humanize(viewing.giveawayType)} /> : null}
             <DetailRow label="Value" value={<span className="mono">{formatNumber(viewing.promotionValue)}</span>} />
+            <DetailRow label="Lifecycle" value={humanize(viewing.giveawayStatus)} />
+            <DetailRow label="Moderation" value={humanize(viewing.moderationStatus)} />
+            <DetailRow label="Enabled" value={viewing.active ? 'Yes' : 'No'} />
             <DetailRow label="Starts" value={formatDate(viewing.startDate)} />
             <DetailRow label="Ends" value={formatDate(viewing.endDate)} />
-            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
+            <DetailRow label="Giveaway ID" value={<CopyId value={viewing.id} />} />
           </DetailSection>
         ) : null}
       </DetailDrawer>
-      <CampaignEditDialog merchantId={merchantId} campaign={editing} onClose={() => setEditing(null)} />
+      <GiveawayFormDialog merchantId={merchantId} open={creating} campaign={null} onClose={() => setCreating(false)} />
+      <GiveawayFormDialog merchantId={merchantId} open={editing !== null} campaign={editing} onClose={() => setEditing(null)} />
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete promotion"
+        title="Delete giveaway"
         description={
           <div className="flex flex-col gap-2">
             <span>
-              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> promotion. It stops applying immediately. This action cannot be
+              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> giveaway. It stops applying immediately. This action cannot be
               undone.
             </span>
             {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
           </div>
         }
-        confirmLabel="Delete promotion"
+        confirmLabel="Delete giveaway"
         tone="danger"
         isLoading={deleteCampaign.isPending}
         onConfirm={() => {
           if (!deleting) return
           setDeleteError(null)
-          deleteCampaign.mutate({ campaignId: deleting.id }, { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) })
+          deleteCampaign.mutate(
+            { campaignId: deleting.id },
+            { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) },
+          )
         }}
         onClose={() => setDeleting(null)}
       />
     </div>
-  )
-}
-
-function toCampaignForm(campaign: AdminCampaign): UpdateCampaignRequest {
-  return { name: campaign.name, startDate: campaign.startDate, endDate: campaign.endDate, promotionValue: campaign.promotionValue }
-}
-
-function CampaignEditDialog({ merchantId, campaign, onClose }: { merchantId: string; campaign: AdminCampaign | null; onClose: () => void }) {
-  const mutation = useUpdateCampaign(merchantId)
-  const [form, setForm] = useState<UpdateCampaignRequest>({ name: '', startDate: '', endDate: '', promotionValue: 0 })
-  const [valueText, setValueText] = useState('')
-  const [errorText, setErrorText] = useState<string | null>(null)
-  const [seededId, setSeededId] = useState<string | null>(null)
-
-  if (campaign && campaign.id !== seededId) {
-    setSeededId(campaign.id)
-    setForm(toCampaignForm(campaign))
-    setValueText(String(campaign.promotionValue))
-    setErrorText(null)
-  }
-
-  const value = Number(valueText)
-  const valueValid = valueText.trim().length > 0 && Number.isFinite(value) && value >= 0
-  const datesOrdered = form.startDate.trim().length === 0 || form.endDate.trim().length === 0 || form.startDate <= form.endDate
-  const canSubmit = form.name.trim().length > 0 && valueValid && datesOrdered
-
-  function field(key: 'name' | 'startDate' | 'endDate') {
-    return (next: string) => setForm((current) => ({ ...current, [key]: next }))
-  }
-
-  function save() {
-    if (!campaign || !canSubmit) return
-    setErrorText(null)
-    mutation.mutate(
-      { campaignId: campaign.id, request: { ...form, promotionValue: value } },
-      { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Update failed')) },
-    )
-  }
-
-  return (
-    <Modal
-      open={campaign !== null}
-      onClose={onClose}
-      title="Edit campaign"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
-            Cancel
-          </Button>
-          <Button isLoading={mutation.isPending} disabled={!canSubmit} onClick={save}>
-            Save changes
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <TextField label="Name" value={form.name} onChange={(event) => field('name')(event.target.value)} />
-        <TextField
-          label="Promotion value"
-          type="number"
-          inputMode="decimal"
-          value={valueText}
-          onChange={(event) => setValueText(event.target.value)}
-          errorText={valueText.trim().length > 0 && !valueValid ? 'Enter a non-negative number' : undefined}
-        />
-        <TextField label="Start date" type="date" value={form.startDate} onChange={(event) => field('startDate')(event.target.value)} />
-        <TextField
-          label="End date"
-          type="date"
-          value={form.endDate}
-          onChange={(event) => field('endDate')(event.target.value)}
-          errorText={!datesOrdered ? 'End date must be on or after the start date' : undefined}
-        />
-        {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
-      </div>
-    </Modal>
   )
 }
 
@@ -711,69 +900,162 @@ function Pagination({ page, hasNextPage, isFetching, onChange }: PaginationProps
   )
 }
 
+function TransactionDetailDrawer({
+  merchantId,
+  transactionId,
+  fallbackTitle,
+  onClose,
+  onVoid,
+}: {
+  merchantId: string
+  transactionId: string | null
+  fallbackTitle?: string
+  onClose: () => void
+  onVoid?: (transactionId: string) => void
+}) {
+  const { data, isLoading, isError, error } = useMerchantTransactionDetail(merchantId, transactionId)
+  const open = transactionId !== null
+  const title = data ? humanize(data.transactionType) : fallbackTitle ?? 'Transaction'
+  return (
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title={title}
+      subtitle={data ? `${data.storeName || 'Store'} · ${formatDate(data.occurredAt)}` : undefined}
+      status={data ? <StatusPill tone={transactionTone(data.status)}>{humanize(data.status)}</StatusPill> : undefined}
+      actions={
+        data && onVoid && data.status !== 'VOIDED' ? (
+          <Button variant="secondary" icon={<Ban className="size-4" aria-hidden />} className="text-red-600" onClick={() => onVoid(data.id)}>
+            Void transaction
+          </Button>
+        ) : undefined
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : isError ? (
+        <ErrorState message={error instanceof Error ? error.message : 'Failed to load transaction'} />
+      ) : data ? (
+        <>
+          <DetailSection title="Parties">
+            <DetailRow label="Customer" value={data.customerDisplayName || '—'} />
+            <DetailRow label="Cashier" value={data.staffDisplayName || '—'} />
+            <DetailRow label="Store" value={data.storeName || '—'} />
+          </DetailSection>
+          <DetailSection title="Amounts">
+            <DetailRow label="Amount" value={<span className="mono">{formatMoney(data.amount, data.currencyCode)}</span>} />
+            <DetailRow label="Points earned" value={<span className="mono text-emerald-700">+{formatNumber(data.pointsEarned)}</span>} />
+            <DetailRow label="Engagement points" value={<span className="mono text-emerald-700">+{formatNumber(data.engagementPointsEarned)}</span>} />
+            <DetailRow label="Points redeemed" value={<span className="mono">{formatNumber(data.pointsRedeemed)}</span>} />
+          </DetailSection>
+          <DetailSection title="Record">
+            <DetailRow label="Type" value={humanize(data.transactionType)} />
+            <DetailRow label="Status" value={humanize(data.status)} />
+            {data.summary ? <DetailRow label="Summary" value={data.summary} /> : null}
+            <DetailRow label="Occurred" value={formatDate(data.occurredAt)} />
+            <DetailRow label="Completed" value={data.completedAt ? formatDate(data.completedAt) : '—'} />
+            {data.originalTransactionId ? <DetailRow label="Voids transaction" value={<CopyId value={data.originalTransactionId} />} /> : null}
+            <DetailRow label="Customer ID" value={<CopyId value={data.customerId} />} />
+            <DetailRow label="Transaction ID" value={<CopyId value={data.id} />} />
+          </DetailSection>
+          <section>
+            <h3 className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-slate-400">Line items</h3>
+            {data.items.length === 0 ? (
+              <p className="rounded-xl border border-slate-200/70 bg-white px-4 py-6 text-center text-sm text-slate-400 shadow-card">No line items recorded</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-card">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/60 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="px-3 py-2 text-left font-semibold">Item</th>
+                      <th className="px-3 py-2 text-right font-semibold">Qty</th>
+                      <th className="px-3 py-2 text-right font-semibold">Unit</th>
+                      <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((item) => (
+                      <tr key={item.id} className="border-b border-slate-100 last:border-0">
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-slate-800">{item.title}</p>
+                          {item.sku ? <p className="mono text-[0.7rem] text-slate-400">{item.sku}</p> : null}
+                        </td>
+                        <td className="mono px-3 py-2.5 text-right text-slate-600">{formatNumber(item.quantity)}</td>
+                        <td className="mono px-3 py-2.5 text-right text-slate-600">{formatMoney(item.unitPrice, data.currencyCode)}</td>
+                        <td className="mono px-3 py-2.5 text-right font-medium text-slate-800">{formatMoney(item.lineTotal, data.currencyCode)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+    </DetailDrawer>
+  )
+}
+
 export function TransactionsTab({ merchantId }: { merchantId: string }) {
   const { admin } = useAdminAuth()
   const canManage = admin ? can(admin.role, 'merchants.config') : false
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch, isFetching } = useMerchantTransactions(merchantId, page)
-  const [voiding, setVoiding] = useState<AdminTransaction | null>(null)
-  const [viewing, setViewing] = useState<AdminTransaction | null>(null)
+  const [voiding, setVoiding] = useState<string | null>(null)
+  const [viewingId, setViewingId] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminTransaction>[] = [
     { header: 'When', render: (txn) => <span className="text-slate-500">{formatDate(txn.occurredAt)}</span> },
     { header: 'Type', render: (txn) => <span className="text-slate-600">{humanize(txn.transactionType)}</span> },
-    { header: 'Amount', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.amount)}</span> },
-    { header: 'Earned', render: (txn) => <span className="mono text-emerald-700">+{formatNumber(txn.pointsEarned)}</span> },
-    { header: 'Redeemed', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.pointsRedeemed)}</span> },
+    { header: 'Amount', align: 'right', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.amount)}</span> },
+    { header: 'Earned', align: 'right', render: (txn) => <span className="mono text-emerald-700">+{formatNumber(txn.pointsEarned)}</span> },
+    { header: 'Redeemed', align: 'right', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.pointsRedeemed)}</span> },
     { header: 'Status', render: (txn) => <StatusPill tone={transactionTone(txn.status)}>{humanize(txn.status)}</StatusPill> },
-    { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> },
+    chevronColumn<AdminTransaction>(),
   ]
   return (
-    <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<Receipt className="size-7" aria-hidden />} emptyTitle="No transactions" onRetry={() => refetch()}>
+    <TabGate
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      isEmpty={rows.length === 0 && page === 0}
+      emptyIcon={<Receipt className="size-7" aria-hidden />}
+      emptyTitle="No transactions"
+      onRetry={() => refetch()}
+    >
       <div className="space-y-4">
-        <SimpleTable<AdminTransaction> rows={rows} getKey={(txn) => txn.id} columns={columns} onRowClick={setViewing} />
+        <SimpleTable<AdminTransaction> rows={rows} getKey={(txn) => txn.id} columns={columns} onRowClick={(txn) => setViewingId(txn.id)} />
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
-      <DetailDrawer
-        open={viewing !== null}
-        onClose={() => setViewing(null)}
-        title={viewing ? humanize(viewing.transactionType) : ''}
-        subtitle={viewing ? formatDate(viewing.occurredAt) : undefined}
-        status={viewing ? <StatusPill tone={transactionTone(viewing.status)}>{humanize(viewing.status)}</StatusPill> : undefined}
-        actions={
-          viewing && canManage && viewing.status !== 'VOIDED' ? (
-            <Button variant="secondary" icon={<Ban className="size-4" aria-hidden />} className="text-red-600" onClick={() => { setVoiding(viewing); setViewing(null) }}>
-              Void transaction
-            </Button>
-          ) : undefined
+      <TransactionDetailDrawer
+        merchantId={merchantId}
+        transactionId={viewingId}
+        onClose={() => setViewingId(null)}
+        onVoid={
+          canManage
+            ? (transactionId) => {
+                setViewingId(null)
+                setVoiding(transactionId)
+              }
+            : undefined
         }
-      >
-        {viewing ? (
-          <DetailSection title="Transaction">
-            <DetailRow label="Type" value={humanize(viewing.transactionType)} />
-            <DetailRow label="Status" value={humanize(viewing.status)} />
-            <DetailRow label="Amount" value={<span className="mono">{formatNumber(viewing.amount)}</span>} />
-            <DetailRow label="Points earned" value={<span className="mono text-emerald-700">+{formatNumber(viewing.pointsEarned)}</span>} />
-            <DetailRow label="Points redeemed" value={<span className="mono">{formatNumber(viewing.pointsRedeemed)}</span>} />
-            <DetailRow label="When" value={formatDate(viewing.occurredAt)} />
-            <DetailRow label="Customer ID" value={<span className="mono text-xs">{viewing.customerId}</span>} />
-            <DetailRow label="Transaction ID" value={<span className="mono text-xs">{viewing.id}</span>} />
-          </DetailSection>
-        ) : null}
-      </DetailDrawer>
-      <TransactionVoidDialog merchantId={merchantId} transaction={voiding} onClose={() => setVoiding(null)} />
+      />
+      <TransactionVoidDialog merchantId={merchantId} transactionId={voiding} onClose={() => setVoiding(null)} />
     </TabGate>
   )
 }
 
-function TransactionVoidDialog({ merchantId, transaction, onClose }: { merchantId: string; transaction: AdminTransaction | null; onClose: () => void }) {
+function TransactionVoidDialog({ merchantId, transactionId, onClose }: { merchantId: string; transactionId: string | null; onClose: () => void }) {
   const mutation = useVoidTransaction(merchantId)
   const [reason, setReason] = useState('')
   const [errorText, setErrorText] = useState<string | null>(null)
   const [seededId, setSeededId] = useState<string | null>(null)
 
-  if (transaction && transaction.id !== seededId) {
-    setSeededId(transaction.id)
+  if (transactionId && transactionId !== seededId) {
+    setSeededId(transactionId)
     setReason('')
     setErrorText(null)
   }
@@ -782,10 +1064,10 @@ function TransactionVoidDialog({ merchantId, transaction, onClose }: { merchantI
   const canSubmit = reason.trim().length > 0
 
   function save() {
-    if (!transaction || !canSubmit) return
+    if (!transactionId || !canSubmit) return
     setErrorText(null)
     mutation.mutate(
-      { transactionId: transaction.id, request: { reason: reason.trim() } },
+      { transactionId, request: { reason: reason.trim() } },
       {
         onSuccess: onClose,
         onError: (error) => {
@@ -801,7 +1083,7 @@ function TransactionVoidDialog({ merchantId, transaction, onClose }: { merchantI
 
   return (
     <Modal
-      open={transaction !== null}
+      open={transactionId !== null}
       onClose={onClose}
       title="Void transaction"
       footer={
@@ -842,12 +1124,14 @@ function TransactionVoidDialog({ merchantId, transaction, onClose }: { merchantI
 export function LedgerTab({ merchantId }: { merchantId: string }) {
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch, isFetching } = useMerchantLedger(merchantId, page)
+  const [viewingId, setViewingId] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminLedgerEntry>[] = [
     { header: 'When', render: (entry) => <span className="text-slate-500">{formatDate(entry.createdAt)}</span> },
     { header: 'Entry', render: (entry) => <span className="text-slate-600">{humanize(entry.entryType)}</span> },
     {
       header: 'Delta',
+      align: 'right',
       render: (entry) => (
         <span className={`mono ${entry.pointsDelta >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
           {entry.pointsDelta >= 0 ? '+' : ''}
@@ -855,35 +1139,44 @@ export function LedgerTab({ merchantId }: { merchantId: string }) {
         </span>
       ),
     },
-    { header: 'Balance', render: (entry) => <span className="mono text-slate-700">{formatNumber(entry.balanceAfter)}</span> },
+    { header: 'Balance', align: 'right', render: (entry) => <span className="mono text-slate-700">{formatNumber(entry.balanceAfter)}</span> },
     { header: 'Reason', render: (entry) => <span className="mono text-xs text-slate-400">{entry.reasonCode}</span> },
+    {
+      header: '',
+      align: 'right',
+      render: (entry) => (entry.transactionId ? <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> : null),
+    },
   ]
   return (
-    <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<BookOpen className="size-7" aria-hidden />} emptyTitle="No ledger entries" onRetry={() => refetch()}>
+    <TabGate
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      isEmpty={rows.length === 0 && page === 0}
+      emptyIcon={<BookOpen className="size-7" aria-hidden />}
+      emptyTitle="No ledger entries"
+      onRetry={() => refetch()}
+    >
       <div className="space-y-4">
-        <SimpleTable<AdminLedgerEntry> rows={rows} getKey={(entry) => entry.id} columns={columns} />
+        <SimpleTable<AdminLedgerEntry>
+          rows={rows}
+          getKey={(entry) => entry.id}
+          columns={columns}
+          onRowClick={(entry) => {
+            if (entry.transactionId) setViewingId(entry.transactionId)
+          }}
+        />
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
+      <TransactionDetailDrawer merchantId={merchantId} transactionId={viewingId} onClose={() => setViewingId(null)} />
     </TabGate>
   )
-}
-
-function approvalTone(status: string): PillTone {
-  switch (status) {
-    case 'APPROVED':
-      return 'success'
-    case 'PENDING':
-      return 'warning'
-    case 'REJECTED':
-      return 'danger'
-    default:
-      return 'neutral'
-  }
 }
 
 export function ApprovalsTab({ merchantId }: { merchantId: string }) {
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error, refetch, isFetching } = useMerchantApprovals(merchantId, page)
+  const [viewing, setViewing] = useState<AdminApproval | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminApproval>[] = [
     { header: 'Requested', render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -891,13 +1184,40 @@ export function ApprovalsTab({ merchantId }: { merchantId: string }) {
     { header: 'Reason', render: (row) => <span className="text-slate-500">{row.reasonText || '—'}</span> },
     { header: 'Expires', render: (row) => <span className="text-slate-500">{row.expiresAt ? formatDate(row.expiresAt) : '—'}</span> },
     { header: 'Status', render: (row) => <StatusPill tone={approvalTone(row.status)}>{humanize(row.status)}</StatusPill> },
+    chevronColumn<AdminApproval>(),
   ]
   return (
-    <TabGate isLoading={isLoading} isError={isError} error={error} isEmpty={rows.length === 0 && page === 0} emptyIcon={<ShieldCheck className="size-7" aria-hidden />} emptyTitle="No approval requests" onRetry={() => refetch()}>
+    <TabGate
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      isEmpty={rows.length === 0 && page === 0}
+      emptyIcon={<ShieldCheck className="size-7" aria-hidden />}
+      emptyTitle="No approval requests"
+      onRetry={() => refetch()}
+    >
       <div className="space-y-4">
-        <SimpleTable<AdminApproval> rows={rows} getKey={(row) => row.id} columns={columns} />
+        <SimpleTable<AdminApproval> rows={rows} getKey={(row) => row.id} columns={columns} onRowClick={setViewing} />
         <Pagination page={page} hasNextPage={rows.length === ledgerPageSize} isFetching={isFetching} onChange={setPage} />
       </div>
+      <DetailDrawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing ? humanize(viewing.requestType) : ''}
+        subtitle={viewing ? `Requested ${formatDate(viewing.createdAt)}` : undefined}
+        status={viewing ? <StatusPill tone={approvalTone(viewing.status)}>{humanize(viewing.status)}</StatusPill> : undefined}
+      >
+        {viewing ? (
+          <DetailSection title="Approval request">
+            <DetailRow label="Type" value={humanize(viewing.requestType)} />
+            <DetailRow label="Status" value={humanize(viewing.status)} />
+            <DetailRow label="Reason" value={viewing.reasonText || '—'} />
+            <DetailRow label="Requested" value={formatDate(viewing.createdAt)} />
+            <DetailRow label="Expires" value={viewing.expiresAt ? formatDate(viewing.expiresAt) : '—'} />
+            <DetailRow label="Request ID" value={<CopyId value={viewing.id} />} />
+          </DetailSection>
+        ) : null}
+      </DetailDrawer>
     </TabGate>
   )
 }
@@ -952,7 +1272,11 @@ export function BillingTab({ merchantId }: { merchantId: string }) {
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <MetricCard label="Open invoices" value={formatNumber(data.summary.openInvoiceCount)} hint={formatMoney(data.summary.openInvoiceAmount, currency)} />
         <MetricCard label="Paid (30 days)" value={formatMoney(data.summary.paidInvoiceAmount30d, currency)} />
-        <MetricCard label="Monthly price" value={data.summary.currentMonthlyPrice !== null ? formatMoney(data.summary.currentMonthlyPrice, currency) : '—'} hint={data.summary.nextRenewalDate ? `renews ${formatDate(data.summary.nextRenewalDate)}` : undefined} />
+        <MetricCard
+          label="Monthly price"
+          value={data.summary.currentMonthlyPrice !== null ? formatMoney(data.summary.currentMonthlyPrice, currency) : '—'}
+          hint={data.summary.nextRenewalDate ? `renews ${formatDate(data.summary.nextRenewalDate)}` : undefined}
+        />
       </section>
 
       <Card className="p-5">

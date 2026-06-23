@@ -3,23 +3,39 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  ArrowUpRight,
+  Award,
+  Briefcase,
+  Building2,
+  Check,
   ChevronRight,
   CircleCheck,
+  Clock,
   Coins,
   Copy,
+  CreditCard,
+  Globe,
+  Hash,
   KeyRound,
+  Mail,
+  MapPin,
   Pencil,
+  Phone,
   Plus,
   Power,
   Receipt,
+  Repeat,
   Search,
   ShieldAlert,
+  ShieldCheck,
   ShieldX,
   Store,
   Tag,
   Trash2,
+  User,
   Users,
   UsersRound,
+  Wallet,
 } from 'lucide-react'
 import {
   customersPageSize,
@@ -47,7 +63,7 @@ import {
 import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import { useDebounce } from '../lib/useDebounce'
-import { accessStateTone, formatDate, formatNumber, humanize, orgStatusTone } from '../lib/format'
+import { accessStateTone, formatDate, formatMoney, formatNumber, humanize, orgStatusTone } from '../lib/format'
 import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill, Switch, TextField } from '../components/ui/primitives'
 import type { PillTone } from '../components/ui/primitives'
 import { ConfirmDialog, Modal } from '../components/ui/Dialog'
@@ -152,7 +168,7 @@ export function MerchantDetailPage() {
         ) : tab === 'staff' ? (
           <StaffTab merchantId={merchantId} />
         ) : tab === 'customers' ? (
-          <CustomersTab merchantId={merchantId} />
+          <CustomersTab merchantId={merchantId} currencyCode={merchant?.defaultCurrencyCode ?? ''} />
         ) : tab === 'programs' ? (
           <ProgramsTab merchantId={merchantId} />
         ) : tab === 'rewards' ? (
@@ -182,6 +198,47 @@ function BackLink() {
       Merchants
     </Link>
   )
+}
+
+function CopyableValue({ value, mono = false }: { value: string; mono?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  if (!value) return <span className="text-sm text-slate-400">—</span>
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <button type="button" onClick={copy} title="Copy to clipboard" className="group inline-flex items-center gap-1.5 text-left">
+      <span className={`text-sm text-slate-800 ${mono ? 'mono break-all' : ''}`}>{value}</span>
+      {copied ? (
+        <Check className="size-3.5 shrink-0 text-emerald-600" aria-hidden />
+      ) : (
+        <Copy className="size-3.5 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" aria-hidden />
+      )}
+    </button>
+  )
+}
+
+function ProfileField({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
+  const display = value === null || value === undefined || value === '' ? <span className="text-sm text-slate-400">—</span> : value
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">{icon}</span>
+      <div className="min-w-0">
+        <dt className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
+        <dd className="mt-0.5">{display}</dd>
+      </div>
+    </div>
+  )
+}
+
+function DrawerCopyRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return <DetailRow label={label} value={<CopyableValue value={value} mono={mono} />} />
 }
 
 const ACCESS_LABEL: Record<OrganizationAccessState, { label: string; tone: PillTone; line: string }> = {
@@ -298,8 +355,63 @@ function OverviewTab({ merchantId, merchant }: { merchantId: string; merchant: M
 
       {merchant ? <LifecycleCard merchantId={merchantId} accessState={merchant.accessState as OrganizationAccessState} /> : null}
       <ProfileCard merchantId={merchantId} merchant={merchant} />
+      <StoresAndHours merchantId={merchantId} />
       {merchant ? <DangerZone merchant={merchant} /> : null}
     </div>
+  )
+}
+
+function StoreHoursCard({ store }: { store: AdminStore }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60">
+            <Store className="size-[18px]" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-ink">{store.name}</h3>
+            <p className="truncate text-xs text-slate-400">{store.category || 'Uncategorized'}</p>
+          </div>
+        </div>
+        <StatusPill tone={activeTone(store.active)}>{store.active ? 'Active' : 'Inactive'}</StatusPill>
+      </div>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3.5 px-5 py-4 sm:grid-cols-2">
+        <ProfileField icon={<Clock className="size-3.5" aria-hidden />} label="Working hours" value={store.workingHours ? <span className="whitespace-pre-line text-sm text-slate-800">{store.workingHours}</span> : ''} />
+        <ProfileField icon={<MapPin className="size-3.5" aria-hidden />} label="Address" value={store.address ? <span className="text-sm text-slate-800">{store.address}</span> : ''} />
+        <ProfileField icon={<Phone className="size-3.5" aria-hidden />} label="Contact" value={<CopyableValue value={store.contactInfo} mono />} />
+        <ProfileField icon={<Hash className="size-3.5" aria-hidden />} label="Store ID" value={<CopyableValue value={store.id} mono />} />
+      </dl>
+    </Card>
+  )
+}
+
+function StoresAndHours({ merchantId }: { merchantId: string }) {
+  const { data, isLoading, isError, error, refetch } = useMerchantStores(merchantId)
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-ink">Stores &amp; hours</h2>
+        {data ? <span className="mono rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{data.length}</span> : null}
+      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Skeleton className="h-44 w-full" />
+          <Skeleton className="h-44 w-full" />
+        </div>
+      ) : isError ? (
+        <ErrorState message={error instanceof Error ? error.message : 'Failed to load stores'} onRetry={() => refetch()} />
+      ) : !data || data.length === 0 ? (
+        <StateBlock icon={<Store className="size-6" aria-hidden />} title="No stores" subtitle="This merchant has no stores yet." />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {data.map((store) => (
+            <StoreHoursCard key={store.id} store={store} />
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -442,39 +554,50 @@ function DangerZone({ merchant }: { merchant: MerchantDetail }) {
   )
 }
 
-const PROFILE_FIELDS: ReadonlyArray<{ label: string; key: keyof MerchantDetail }> = [
-  { label: 'Legal name', key: 'legalName' },
-  { label: 'Industry', key: 'industry' },
-  { label: 'Email', key: 'email' },
-  { label: 'Phone', key: 'phone' },
-  { label: 'Currency', key: 'defaultCurrencyCode' },
-  { label: 'Timezone', key: 'defaultTimezone' },
-  { label: 'Plan', key: 'planCode' },
-]
-
 function ProfileCard({ merchantId, merchant }: { merchantId: string; merchant: MerchantDetail | undefined }) {
   const { admin } = useAdminAuth()
   const canManage = admin ? can(admin.role, 'merchants.config') : false
   const [editing, setEditing] = useState(false)
+
+  if (!merchant) {
+    return (
+      <Card className="p-5">
+        <Skeleton className="mb-4 h-5 w-24" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 9 }).map((_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Profile</h2>
-        {canManage && merchant ? (
+        {canManage ? (
           <Button variant="secondary" icon={<Pencil className="size-4" aria-hidden />} className="h-8 px-2.5" onClick={() => setEditing(true)}>
             Edit
           </Button>
         ) : null}
       </div>
-      <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-        {PROFILE_FIELDS.map((field) => (
-          <div key={field.key} className="flex flex-col gap-0.5">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{field.label}</dt>
-            <dd className="text-sm text-slate-800">{merchant ? merchant[field.key] || '—' : <Skeleton className="h-4 w-32" />}</dd>
-          </div>
-        ))}
+      <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ProfileField icon={<Building2 className="size-3.5" aria-hidden />} label="Legal name" value={merchant.legalName ? <span className="text-sm text-slate-800">{merchant.legalName}</span> : ''} />
+        <ProfileField icon={<Store className="size-3.5" aria-hidden />} label="Display name" value={merchant.displayName ? <span className="text-sm text-slate-800">{merchant.displayName}</span> : ''} />
+        <ProfileField icon={<Briefcase className="size-3.5" aria-hidden />} label="Industry" value={merchant.industry ? <span className="text-sm text-slate-800">{humanize(merchant.industry)}</span> : ''} />
+        <ProfileField icon={<Mail className="size-3.5" aria-hidden />} label="Email" value={<CopyableValue value={merchant.email} />} />
+        <ProfileField icon={<Phone className="size-3.5" aria-hidden />} label="Phone" value={<CopyableValue value={merchant.phone} mono />} />
+        <ProfileField icon={<Tag className="size-3.5" aria-hidden />} label="Slug" value={<CopyableValue value={merchant.slug} mono />} />
+        <ProfileField icon={<Wallet className="size-3.5" aria-hidden />} label="Currency" value={merchant.defaultCurrencyCode ? <span className="mono text-sm text-slate-800">{merchant.defaultCurrencyCode}</span> : ''} />
+        <ProfileField icon={<Globe className="size-3.5" aria-hidden />} label="Timezone" value={merchant.defaultTimezone ? <span className="text-sm text-slate-800">{merchant.defaultTimezone}</span> : ''} />
+        <ProfileField icon={<CreditCard className="size-3.5" aria-hidden />} label="Plan" value={merchant.planCode ? <span className="text-sm text-slate-800">{humanize(merchant.planCode)}</span> : ''} />
+        <ProfileField icon={<ShieldCheck className="size-3.5" aria-hidden />} label="Status" value={<StatusPill tone={orgStatusTone(merchant.status)}>{humanize(merchant.status)}</StatusPill>} />
+        <ProfileField icon={<Power className="size-3.5" aria-hidden />} label="Access state" value={<StatusPill tone={accessStateTone(merchant.accessState)}>{humanize(merchant.accessState)}</StatusPill>} />
+        <ProfileField icon={<User className="size-3.5" aria-hidden />} label="Owner user ID" value={<CopyableValue value={merchant.ownerUserId ?? ''} mono />} />
+        <ProfileField icon={<Hash className="size-3.5" aria-hidden />} label="Organization ID" value={<CopyableValue value={merchant.organizationId} mono />} />
       </dl>
-      {merchant ? <ProfileEditDialog merchantId={merchantId} merchant={merchant} open={editing} onClose={() => setEditing(false)} /> : null}
+      <ProfileEditDialog merchantId={merchantId} merchant={merchant} open={editing} onClose={() => setEditing(false)} />
     </Card>
   )
 }
@@ -689,14 +812,21 @@ function StoresTab({ merchantId }: { merchantId: string }) {
         }
       >
         {viewing ? (
-          <DetailSection title="Store details">
-            <DetailRow label="Name" value={viewing.name} />
-            <DetailRow label="Category" value={viewing.category} />
-            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
-            <DetailRow label="Address" value={viewing.address} />
-            <DetailRow label="Contact" value={<span className="mono">{viewing.contactInfo}</span>} />
-            <DetailRow label="Working hours" value={viewing.workingHours} />
-          </DetailSection>
+          <>
+            <DetailSection title="Store details">
+              <DetailRow label="Name" value={viewing.name} />
+              <DetailRow label="Category" value={viewing.category} />
+              <DetailRow label="Status" value={<StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill>} />
+            </DetailSection>
+            <DetailSection title="Location &amp; hours">
+              <DetailRow label="Address" value={viewing.address} />
+              <DetailRow label="Working hours" value={viewing.workingHours ? <span className="whitespace-pre-line">{viewing.workingHours}</span> : ''} />
+              <DrawerCopyRow label="Contact" value={viewing.contactInfo} mono />
+            </DetailSection>
+            <DetailSection title="Identifiers">
+              <DrawerCopyRow label="Store ID" value={viewing.id} mono />
+            </DetailSection>
+          </>
         ) : null}
       </DetailDrawer>
       <StoreEditDialog merchantId={merchantId} store={editing} onClose={() => setEditing(null)} />
@@ -925,12 +1055,21 @@ function StaffTab({ merchantId }: { merchantId: string }) {
         }
       >
         {viewing ? (
-          <DetailSection title="Staff member">
-            <DetailRow label="Name" value={`${viewing.firstName} ${viewing.lastName}`.trim()} />
-            <DetailRow label="Email" value={viewing.email} />
-            <DetailRow label="Role" value={humanize(viewing.role)} />
-            <DetailRow label="Status" value={viewing.active ? 'Active' : 'Inactive'} />
-          </DetailSection>
+          <>
+            <DetailSection title="Staff member">
+              <DetailRow label="First name" value={viewing.firstName} />
+              <DetailRow label="Last name" value={viewing.lastName} />
+              <DetailRow label="Role" value={<StatusPill tone="info">{humanize(viewing.role)}</StatusPill>} />
+              <DetailRow label="Status" value={<StatusPill tone={activeTone(viewing.active)}>{viewing.active ? 'Active' : 'Inactive'}</StatusPill>} />
+            </DetailSection>
+            <DetailSection title="Contact">
+              <DrawerCopyRow label="Email" value={viewing.email} />
+            </DetailSection>
+            <DetailSection title="Identifiers">
+              <DrawerCopyRow label="User ID" value={viewing.userId} mono />
+              <DrawerCopyRow label="Staff ID" value={viewing.id} mono />
+            </DetailSection>
+          </>
         ) : null}
       </DetailDrawer>
       <StaffRoleDialog merchantId={merchantId} member={editingRole} onClose={() => setEditingRole(null)} />
@@ -1240,7 +1379,31 @@ function customerStatusTone(status: string) {
   }
 }
 
-function CustomersTab({ merchantId }: { merchantId: string }) {
+function spendText(value: number, currencyCode: string): string {
+  return currencyCode ? formatMoney(value, currencyCode) : formatNumber(value)
+}
+
+const CUSTOMER_METRIC_TONES: Record<PillTone, string> = {
+  success: 'bg-emerald-50 text-emerald-600',
+  danger: 'bg-red-50 text-red-600',
+  warning: 'bg-amber-50 text-amber-600',
+  neutral: 'bg-slate-100 text-slate-500',
+  info: 'bg-sky-50 text-sky-600',
+}
+
+function CustomerMetric({ icon, label, value, tone = 'neutral' }: { icon: ReactNode; label: string; value: string; tone?: PillTone }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5">
+      <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${CUSTOMER_METRIC_TONES[tone]}`}>{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[0.62rem] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="mono truncate text-sm font-semibold text-ink">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function CustomersTab({ merchantId, currencyCode }: { merchantId: string; currencyCode: string }) {
   const [searchInput, setSearchInput] = useState('')
   const [page, setPage] = useState(0)
   const search = useDebounce(searchInput, 300)
@@ -1270,10 +1433,14 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
         </div>
       ),
     },
-    { header: 'Phone', render: (customer) => <span className="mono text-slate-600">{customer.phoneNumber}</span> },
-    { header: 'Tier', render: (customer) => <span className="text-slate-600">{customer.loyaltyTier}</span> },
+    { header: 'Phone', render: (customer) => <span className="mono text-slate-600">{customer.phoneNumber || '—'}</span> },
+    {
+      header: 'Tier',
+      render: (customer) => (customer.loyaltyTier ? <StatusPill tone="warning">{humanize(customer.loyaltyTier)}</StatusPill> : <span className="text-slate-400">—</span>),
+    },
     { header: 'Points', align: 'right', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.currentPoints)}</span> },
     { header: 'Visits', align: 'right', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.totalVisits)}</span> },
+    { header: 'Spent', align: 'right', render: (customer) => <span className="mono text-slate-700">{spendText(customer.totalSpent, currencyCode)}</span> },
     { header: 'Last visit', render: (customer) => <span className="text-slate-500">{customer.lastVisitAt ? formatDate(customer.lastVisitAt) : '—'}</span> },
     { header: 'Status', render: (customer) => <StatusPill tone={customerStatusTone(customer.status)}>{humanize(customer.status)}</StatusPill> },
   ]
@@ -1332,44 +1499,62 @@ function CustomersTab({ merchantId }: { merchantId: string }) {
         subtitle={viewing?.loyaltyId}
         status={viewing ? <StatusPill tone={customerStatusTone(viewing.status)}>{humanize(viewing.status)}</StatusPill> : undefined}
         actions={
-          viewing && canManage ? (
+          viewing ? (
             <>
-              <Button
-                variant="secondary"
-                icon={<Power className="size-4" aria-hidden />}
-                className={viewing.status === 'BLOCKED' ? 'text-brand-dark' : 'text-red-600'}
-                isLoading={setBlocked.isPending}
-                onClick={() => toggleBlock(viewing)}
+              <Link
+                to={`/admin/customers/${viewing.customerId}`}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
               >
-                {viewing.status === 'BLOCKED' ? 'Unblock' : 'Block'}
-              </Button>
-              <Button variant="secondary" icon={<Coins className="size-4" aria-hidden />} onClick={() => { setAdjusting(viewing); setViewing(null) }}>
-                Adjust points
-              </Button>
-              <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditing(viewing); setViewing(null) }}>
-                Edit
-              </Button>
+                <ArrowUpRight className="size-4" aria-hidden />
+                Global profile
+              </Link>
+              {canManage ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    icon={<Power className="size-4" aria-hidden />}
+                    className={viewing.status === 'BLOCKED' ? 'text-brand-dark' : 'text-red-600'}
+                    isLoading={setBlocked.isPending}
+                    onClick={() => toggleBlock(viewing)}
+                  >
+                    {viewing.status === 'BLOCKED' ? 'Unblock' : 'Block'}
+                  </Button>
+                  <Button variant="secondary" icon={<Coins className="size-4" aria-hidden />} onClick={() => { setAdjusting(viewing); setViewing(null) }}>
+                    Adjust points
+                  </Button>
+                  <Button icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setEditing(viewing); setViewing(null) }}>
+                    Edit
+                  </Button>
+                </>
+              ) : null}
             </>
           ) : undefined
         }
       >
         {viewing ? (
           <>
-            <DetailSection title="Loyalty">
-              <DetailRow label="Loyalty ID" value={<span className="mono">{viewing.loyaltyId}</span>} />
-              <DetailRow label="Tier" value={humanize(viewing.loyaltyTier)} />
-              <DetailRow label="Current points" value={<span className="mono">{formatNumber(viewing.currentPoints)}</span>} />
-              <DetailRow label="Total visits" value={<span className="mono">{formatNumber(viewing.totalVisits)}</span>} />
-              <DetailRow label="Total spent" value={<span className="mono">{formatNumber(viewing.totalSpent)}</span>} />
+            <div className="grid grid-cols-2 gap-2.5">
+              <CustomerMetric icon={<Coins className="size-4" aria-hidden />} label="Points" value={formatNumber(viewing.currentPoints)} tone="info" />
+              <CustomerMetric icon={<Award className="size-4" aria-hidden />} label="Tier" value={viewing.loyaltyTier ? humanize(viewing.loyaltyTier) : '—'} tone="warning" />
+              <CustomerMetric icon={<Repeat className="size-4" aria-hidden />} label="Visits" value={formatNumber(viewing.totalVisits)} />
+              <CustomerMetric icon={<Wallet className="size-4" aria-hidden />} label="Spent" value={spendText(viewing.totalSpent, currencyCode)} tone="success" />
+            </div>
+            <DetailSection title="Identity">
+              <DetailRow label="First name" value={viewing.firstName} />
+              <DetailRow label="Last name" value={viewing.lastName} />
             </DetailSection>
             <DetailSection title="Contact">
-              <DetailRow label="Phone" value={<span className="mono">{viewing.phoneNumber}</span>} />
-              <DetailRow label="Email" value={viewing.email} />
+              <DrawerCopyRow label="Phone" value={viewing.phoneNumber} mono />
+              <DrawerCopyRow label="Email" value={viewing.email} />
             </DetailSection>
             <DetailSection title="Activity">
-              <DetailRow label="Status" value={humanize(viewing.status)} />
+              <DetailRow label="Status" value={<StatusPill tone={customerStatusTone(viewing.status)}>{humanize(viewing.status)}</StatusPill>} />
               <DetailRow label="Last visit" value={viewing.lastVisitAt ? formatDate(viewing.lastVisitAt) : 'Never'} />
               <DetailRow label="Enrolled" value={formatDate(viewing.enrolledAt)} />
+            </DetailSection>
+            <DetailSection title="Identifiers">
+              <DrawerCopyRow label="Loyalty ID" value={viewing.loyaltyId} mono />
+              <DrawerCopyRow label="Customer ID" value={viewing.customerId} mono />
             </DetailSection>
           </>
         ) : null}

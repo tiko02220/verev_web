@@ -1,38 +1,87 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Building2, Coins, Receipt, Repeat, Store, UsersRound } from 'lucide-react'
-import { useGlobalCustomer } from '../api/customers'
-import { formatDate, formatNumber, humanize } from '../lib/format'
-import { Card, ErrorState, Skeleton, StateBlock, StatusPill } from '../components/ui/primitives'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Award,
+  Cake,
+  Calendar,
+  Check,
+  Coins,
+  Copy,
+  Hash,
+  Mail,
+  Phone,
+  Receipt,
+  Repeat,
+  Store,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  User,
+  UsersRound,
+  Wallet,
+} from 'lucide-react'
+import { useDeleteGlobalCustomer, useGlobalCustomer } from '../api/customers'
+import { formatDate, formatNumber, humanize, orgStatusTone } from '../lib/format'
+import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill } from '../components/ui/primitives'
 import type { PillTone } from '../components/ui/primitives'
-import type { PlatformCustomerLedgerEntry, PlatformCustomerOrgAffiliation } from '../types/api'
+import { ConfirmDialog } from '../components/ui/Dialog'
+import type { PlatformCustomerIdentity, PlatformCustomerLedgerEntry, PlatformCustomerOrgAffiliation } from '../types/api'
 
 function BackLink() {
   return (
-    <Link to="/admin/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
+    <Link to="/admin/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800">
       <ArrowLeft className="size-4" aria-hidden />
       Customers
     </Link>
   )
 }
 
-function affiliationTone(status: string): PillTone {
-  switch (status) {
-    case 'ACTIVE':
-      return 'success'
-    case 'BLOCKED':
-      return 'danger'
-    default:
-      return 'neutral'
+function CopyableValue({ value, mono = false }: { value: string; mono?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  if (!value) return <span className="text-sm text-slate-400">—</span>
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
   }
+  return (
+    <button type="button" onClick={copy} title="Copy to clipboard" className="group inline-flex items-center gap-1.5 text-left">
+      <span className={`text-sm text-slate-800 ${mono ? 'mono' : ''}`}>{value}</span>
+      {copied ? (
+        <Check className="size-3.5 shrink-0 text-emerald-600" aria-hidden />
+      ) : (
+        <Copy className="size-3.5 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" aria-hidden />
+      )}
+    </button>
+  )
 }
 
-function IdentityField({ label, value }: { label: string; value: ReactNode }) {
-  const display = value === null || value === undefined || value === '' ? '—' : value
+function ageFrom(birthDate: string): number | null {
+  const parsed = new Date(birthDate)
+  if (Number.isNaN(parsed.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - parsed.getFullYear()
+  const monthDelta = now.getMonth() - parsed.getMonth()
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < parsed.getDate())) age -= 1
+  return age >= 0 && age < 130 ? age : null
+}
+
+function IdentityField({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
+  const display = value === null || value === undefined || value === '' ? <span className="text-sm text-slate-400">—</span> : value
   return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-sm text-slate-800">{display}</dd>
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">{icon}</span>
+      <div className="min-w-0">
+        <dt className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
+        <dd className="mt-0.5">{display}</dd>
+      </div>
     </div>
   )
 }
@@ -49,8 +98,8 @@ function OrgMetric({ icon, label, value, tone = 'neutral' }: { icon: ReactNode; 
     <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5">
       <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${iconTone[tone]}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="mono text-sm font-semibold text-ink">{value}</p>
+        <p className="text-[0.62rem] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="mono truncate text-sm font-semibold text-ink">{value}</p>
       </div>
     </div>
   )
@@ -59,10 +108,17 @@ function OrgMetric({ icon, label, value, tone = 'neutral' }: { icon: ReactNode; 
 function LedgerLine({ entry }: { entry: PlatformCustomerLedgerEntry }) {
   const positive = entry.pointsDelta >= 0
   return (
-    <li className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-0">
-      <div className="min-w-0">
-        <p className="truncate text-sm text-slate-700">{humanize(entry.reasonCode)}</p>
-        <p className="text-xs text-slate-400">{formatDate(entry.createdAt)}</p>
+    <li className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${positive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+          {positive ? <TrendingUp className="size-3.5" aria-hidden /> : <TrendingDown className="size-3.5" aria-hidden />}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-slate-700">{humanize(entry.reasonCode)}</p>
+          <p className="mono truncate text-[0.7rem] text-slate-400" title={entry.transactionId}>
+            {formatDate(entry.createdAt)} · {entry.transactionId.slice(0, 8)}
+          </p>
+        </div>
       </div>
       <span className={`mono shrink-0 text-sm font-semibold ${positive ? 'text-emerald-700' : 'text-red-600'}`}>
         {positive ? '+' : ''}
@@ -74,49 +130,102 @@ function LedgerLine({ entry }: { entry: PlatformCustomerLedgerEntry }) {
 
 function MerchantCard({ org }: { org: PlatformCustomerOrgAffiliation }) {
   return (
-    <Card className="p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60">
-            <Building2 className="size-[18px]" aria-hidden />
+    <Card className="overflow-hidden">
+      <Link
+        to={`/admin/merchants/${org.organizationId}`}
+        className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 transition-colors hover:bg-slate-50"
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60">
+            <Store className="size-[18px]" aria-hidden />
           </span>
-          <div>
-            <h3 className="text-sm font-semibold text-ink">{org.organizationName}</h3>
-            <p className="text-xs text-slate-400">Enrolled {formatDate(org.enrolledAt)}</p>
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-1 truncate text-sm font-semibold text-ink">
+              {org.organizationName}
+              <ArrowUpRight className="size-3.5 shrink-0 text-slate-300" aria-hidden />
+            </h3>
+            <p className="text-xs text-slate-400">
+              Enrolled {formatDate(org.enrolledAt)} · Last visit {org.lastVisitAt ? formatDate(org.lastVisitAt) : 'never'}
+            </p>
           </div>
         </div>
-        <StatusPill tone={affiliationTone(org.status)}>{humanize(org.status)}</StatusPill>
-      </div>
+        <StatusPill tone={orgStatusTone(org.status)}>{humanize(org.status)}</StatusPill>
+      </Link>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2.5 px-5 py-4 lg:grid-cols-3">
         <OrgMetric icon={<Coins className="size-4" aria-hidden />} label="Points" value={formatNumber(org.currentPoints)} tone="info" />
-        <OrgMetric icon={<UsersRound className="size-4" aria-hidden />} label="Tier" value={org.loyaltyTier ? humanize(org.loyaltyTier) : '—'} />
+        <OrgMetric icon={<Award className="size-4" aria-hidden />} label="Tier" value={org.loyaltyTier ? humanize(org.loyaltyTier) : '—'} tone="warning" />
         <OrgMetric icon={<Repeat className="size-4" aria-hidden />} label="Visits" value={formatNumber(org.totalVisits)} />
         <OrgMetric icon={<Receipt className="size-4" aria-hidden />} label="Total spent" value={formatNumber(org.totalSpent)} />
-        <OrgMetric icon={<Coins className="size-4" aria-hidden />} label="Lifetime earned" value={formatNumber(org.lifetimePointsEarned)} tone="success" />
-        <OrgMetric icon={<Coins className="size-4" aria-hidden />} label="Lifetime redeemed" value={formatNumber(org.lifetimePointsRedeemed)} />
+        <OrgMetric icon={<TrendingUp className="size-4" aria-hidden />} label="Lifetime earned" value={formatNumber(org.lifetimePointsEarned)} tone="success" />
+        <OrgMetric icon={<TrendingDown className="size-4" aria-hidden />} label="Lifetime redeemed" value={formatNumber(org.lifetimePointsRedeemed)} tone="danger" />
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-slate-400">Recent activity</p>
-        <p className="text-xs text-slate-400">Last visit {org.lastVisitAt ? formatDate(org.lastVisitAt) : 'never'}</p>
+      <div className="border-t border-slate-100 px-5 py-3">
+        <p className="mb-1 text-[0.7rem] font-semibold uppercase tracking-wider text-slate-400">Recent activity</p>
+        {org.recentLedger.length === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-3 text-center text-xs text-slate-400">No recent activity</p>
+        ) : (
+          <ul>
+            {org.recentLedger.map((entry) => (
+              <LedgerLine key={entry.id} entry={entry} />
+            ))}
+          </ul>
+        )}
       </div>
-      {org.recentLedger.length === 0 ? (
-        <p className="mt-2 rounded-lg bg-slate-50 px-3 py-3 text-center text-xs text-slate-400">No recent activity</p>
-      ) : (
-        <ul className="mt-1">
-          {org.recentLedger.map((entry) => (
-            <LedgerLine key={entry.id} entry={entry} />
-          ))}
-        </ul>
-      )}
     </Card>
+  )
+}
+
+function totalsOf(orgs: PlatformCustomerOrgAffiliation[]) {
+  return orgs.reduce(
+    (acc, org) => ({
+      points: acc.points + org.currentPoints,
+      earned: acc.earned + org.lifetimePointsEarned,
+      redeemed: acc.redeemed + org.lifetimePointsRedeemed,
+      visits: acc.visits + org.totalVisits,
+      spent: acc.spent + org.totalSpent,
+    }),
+    { points: 0, earned: 0, redeemed: 0, visits: 0, spent: 0 },
+  )
+}
+
+function IdentityHero({ customer }: { customer: PlatformCustomerIdentity }) {
+  const name = `${customer.firstName} ${customer.lastName}`.trim() || 'Customer'
+  const initials = `${customer.firstName.charAt(0)}${customer.lastName.charAt(0)}`.toUpperCase() || '?'
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-brand text-lg font-semibold text-white shadow-sm">{initials}</span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-xl font-semibold tracking-tight text-ink">{name}</h1>
+          <StatusPill tone="info">{customer.loyaltyId}</StatusPill>
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <Phone className="size-3.5 text-slate-400" aria-hidden />
+            <span className="mono">{customer.phoneNumber || '—'}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Mail className="size-3.5 text-slate-400" aria-hidden />
+            {customer.email || '—'}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="size-3.5 text-slate-400" aria-hidden />
+            Member since {formatDate(customer.enrolledDate)}
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 
 export function CustomerDetailPage() {
   const { customerId = '' } = useParams()
+  const navigate = useNavigate()
   const { data, isLoading, isError, error, refetch } = useGlobalCustomer(customerId)
+  const deleteCustomer = useDeleteGlobalCustomer()
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   if (isError) {
     return (
@@ -127,63 +236,106 @@ export function CustomerDetailPage() {
     )
   }
 
-  const customer = data?.customer
-  const name = customer ? `${customer.firstName} ${customer.lastName}`.trim() || 'Customer' : ''
+  if (isLoading || !data) {
+    return (
+      <div className="space-y-6 p-6 sm:p-8">
+        <BackLink />
+        <Skeleton className="h-16 w-full" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-24 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-56 w-full" />
+      </div>
+    )
+  }
+
+  const customer = data.customer
+  const name = `${customer.firstName} ${customer.lastName}`.trim()
+  const totals = totalsOf(data.organizations)
+  const age = ageFrom(customer.birthDate)
 
   return (
     <>
       <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-canvas/85 px-6 pt-5 pb-5 backdrop-blur-md sm:px-8">
         <BackLink />
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {customer ? (
-            <>
-              <h1 className="text-xl font-semibold tracking-tight text-ink">{name}</h1>
-              <StatusPill tone="info">{customer.loyaltyId}</StatusPill>
-            </>
-          ) : (
-            <Skeleton className="h-7 w-48" />
-          )}
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <IdentityHero customer={customer} />
+          <Button variant="danger" icon={<Trash2 className="size-4" aria-hidden />} onClick={() => setConfirmingDelete(true)}>
+            Delete
+          </Button>
         </div>
       </header>
 
       <div className="admin-rise space-y-6 p-6 sm:p-8">
-        {isLoading || !data || !customer ? (
-          <>
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-56 w-full" />
-          </>
-        ) : (
-          <>
-            <Card className="p-5">
-              <h2 className="mb-4 text-sm font-semibold text-ink">Identity</h2>
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-                <IdentityField label="Phone" value={<span className="mono">{customer.phoneNumber}</span>} />
-                <IdentityField label="Email" value={customer.email} />
-                <IdentityField label="Gender" value={customer.gender ? humanize(customer.gender) : ''} />
-                <IdentityField label="Birth date" value={customer.birthDate ? formatDate(customer.birthDate) : ''} />
-                <IdentityField label="Loyalty ID" value={<span className="mono">{customer.loyaltyId}</span>} />
-                <IdentityField label="Enrolled" value={formatDate(customer.enrolledDate)} />
-              </dl>
-            </Card>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <MetricCard label="Merchants" value={formatNumber(data.organizations.length)} icon={<Store className="size-4" aria-hidden />} tone="info" />
+          <MetricCard label="Points held" value={formatNumber(totals.points)} icon={<Coins className="size-4" aria-hidden />} tone="info" />
+          <MetricCard label="Lifetime earned" value={formatNumber(totals.earned)} icon={<TrendingUp className="size-4" aria-hidden />} tone="success" />
+          <MetricCard label="Lifetime redeemed" value={formatNumber(totals.redeemed)} icon={<TrendingDown className="size-4" aria-hidden />} tone="danger" />
+          <MetricCard label="Total visits" value={formatNumber(totals.visits)} icon={<Repeat className="size-4" aria-hidden />} tone="neutral" />
+          <MetricCard label="Total spent" value={formatNumber(totals.spent)} icon={<Wallet className="size-4" aria-hidden />} tone="warning" />
+        </div>
 
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-ink">Merchants</h2>
-                <span className="mono rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{data.organizations.length}</span>
-              </div>
-              {data.organizations.length === 0 ? (
-                <StateBlock icon={<Store className="size-6" aria-hidden />} title="No merchant cards" subtitle="This customer is not enrolled with any merchant yet." />
-              ) : (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {data.organizations.map((org) => (
-                    <MerchantCard key={org.organizationId} org={org} />
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
+        <Card className="p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Identity</h2>
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+            <IdentityField icon={<User className="size-3.5" aria-hidden />} label="First name" value={<span className="text-sm text-slate-800">{customer.firstName || '—'}</span>} />
+            <IdentityField icon={<User className="size-3.5" aria-hidden />} label="Last name" value={<span className="text-sm text-slate-800">{customer.lastName || '—'}</span>} />
+            <IdentityField icon={<UsersRound className="size-3.5" aria-hidden />} label="Gender" value={customer.gender ? <span className="text-sm text-slate-800">{humanize(customer.gender)}</span> : ''} />
+            <IdentityField icon={<Phone className="size-3.5" aria-hidden />} label="Phone" value={<CopyableValue value={customer.phoneNumber} mono />} />
+            <IdentityField icon={<Mail className="size-3.5" aria-hidden />} label="Email" value={<CopyableValue value={customer.email} />} />
+            <IdentityField
+              icon={<Cake className="size-3.5" aria-hidden />}
+              label="Birth date"
+              value={customer.birthDate ? <span className="text-sm text-slate-800">{formatDate(customer.birthDate)}{age !== null ? ` · ${age} yrs` : ''}</span> : ''}
+            />
+            <IdentityField icon={<Hash className="size-3.5" aria-hidden />} label="Loyalty ID" value={<CopyableValue value={customer.loyaltyId} mono />} />
+            <IdentityField icon={<Hash className="size-3.5" aria-hidden />} label="Customer ID" value={<CopyableValue value={customer.customerId} mono />} />
+            <IdentityField icon={<Calendar className="size-3.5" aria-hidden />} label="Enrolled" value={<span className="text-sm text-slate-800">{formatDate(customer.enrolledDate)}</span>} />
+          </dl>
+        </Card>
+
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-ink">Merchant memberships</h2>
+            <span className="mono rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{data.organizations.length}</span>
+          </div>
+          {data.organizations.length === 0 ? (
+            <StateBlock icon={<Store className="size-6" aria-hidden />} title="No merchant cards" subtitle="This customer is not enrolled with any merchant yet." />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {data.organizations.map((org) => (
+                <MerchantCard key={org.organizationId} org={org} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete customer"
+        description={`Permanently remove ${name || 'this customer'} and detach them from all merchant cards. This cannot be undone.`}
+        confirmLabel="Delete customer"
+        tone="danger"
+        confirmPhrase={customer.loyaltyId}
+        isLoading={deleteCustomer.isPending}
+        onConfirm={() =>
+          deleteCustomer.mutate(
+            { customerId },
+            {
+              onSuccess: () => {
+                setConfirmingDelete(false)
+                navigate('/admin/customers')
+              },
+            },
+          )
+        }
+        onClose={() => setConfirmingDelete(false)}
+      />
     </>
   )
 }

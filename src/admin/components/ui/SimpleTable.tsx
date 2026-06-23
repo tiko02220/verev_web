@@ -32,7 +32,19 @@ export function SimpleTable<T>({ rows, columns, getKey, onRowClick }: SimpleTabl
             <tr
               key={getKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 ${onRowClick ? 'cursor-pointer' : ''}`}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onRowClick(row)
+                      }
+                    }
+                  : undefined
+              }
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? 'button' : undefined}
+              className={`border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 ${onRowClick ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40' : ''}`}
             >
               {columns.map((column) => (
                 <td

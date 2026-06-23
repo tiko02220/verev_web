@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, UsersRound } from 'lucide-react'
 import { globalCustomersPageSize, useGlobalCustomers } from '../api/customers'
 import { useDebounce } from '../lib/useDebounce'
-import { formatNumber } from '../lib/format'
+import { formatDate, formatNumber } from '../lib/format'
 import { Button, ErrorState, PageHeader, Skeleton, StateBlock } from '../components/ui/primitives'
 import { SimpleTable } from '../components/ui/SimpleTable'
 import type { SimpleColumn } from '../components/ui/SimpleTable'
@@ -41,6 +41,7 @@ export function CustomersPage() {
     { header: 'Phone', render: (customer) => <span className="mono text-slate-600">{customer.phoneNumber}</span> },
     { header: 'Email', render: (customer) => <span className="text-slate-600">{customer.email || '—'}</span> },
     { header: 'Merchants', align: 'right', render: (customer) => <span className="mono text-slate-700">{formatNumber(customer.organizationCount)}</span> },
+    { header: 'Enrolled', render: (customer) => <span className="text-slate-500">{formatDate(customer.enrolledDate)}</span> },
   ]
 
   return (

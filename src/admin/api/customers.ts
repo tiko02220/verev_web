@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/apiClient'
 import type { PlatformCustomerDetail, PlatformCustomerSummary } from '../types/api'
 
@@ -22,5 +22,14 @@ export function useGlobalCustomer(customerId: string) {
     queryKey: ['global-customer', customerId],
     queryFn: () => api.get<PlatformCustomerDetail>('/v1/admin/customers/get', { customerId }),
     enabled: customerId.length > 0,
+  })
+}
+
+export function useDeleteGlobalCustomer() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ customerId }: { customerId: string }) =>
+      api.post<Record<string, string>>('/v1/admin/customers/delete', undefined, { customerId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['global-customers'] }),
   })
 }
