@@ -19,8 +19,9 @@ export function formatMoney(value: number, currencyCode: string): string {
 export function humanize(token: string): string {
   return token
     .toLowerCase()
-    .split('_')
-    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .split(/[._\-\s]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ')
 }
 

@@ -1008,12 +1008,22 @@ export function TransactionsTab({ merchantId }: { merchantId: string }) {
   const [viewingId, setViewingId] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminTransaction>[] = [
-    { header: 'When', render: (txn) => <span className="text-slate-500">{formatDate(txn.occurredAt)}</span> },
+    {
+      header: 'Customer',
+      render: (txn) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-slate-800">{txn.customerDisplayName || 'Unknown customer'}</span>
+          <span className="text-xs text-slate-400">{txn.storeName || 'Unknown store'}</span>
+        </div>
+      ),
+    },
+    { header: 'Cashier', render: (txn) => <span className="text-slate-600">{txn.staffDisplayName || '—'}</span> },
     { header: 'Type', render: (txn) => <span className="text-slate-600">{humanize(txn.transactionType)}</span> },
-    { header: 'Amount', align: 'right', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.amount)}</span> },
+    { header: 'Amount', align: 'right', render: (txn) => <span className="mono text-slate-700">{formatMoney(txn.amount, txn.currencyCode)}</span> },
     { header: 'Earned', align: 'right', render: (txn) => <span className="mono text-emerald-700">+{formatNumber(txn.pointsEarned)}</span> },
     { header: 'Redeemed', align: 'right', render: (txn) => <span className="mono text-slate-700">{formatNumber(txn.pointsRedeemed)}</span> },
     { header: 'Status', render: (txn) => <StatusPill tone={transactionTone(txn.status)}>{humanize(txn.status)}</StatusPill> },
+    { header: 'When', render: (txn) => <span className="text-slate-500">{formatDate(txn.occurredAt)}</span> },
     chevronColumn<AdminTransaction>(),
   ]
   return (
@@ -1127,6 +1137,7 @@ export function LedgerTab({ merchantId }: { merchantId: string }) {
   const [viewingId, setViewingId] = useState<string | null>(null)
   const rows = data ?? []
   const columns: SimpleColumn<AdminLedgerEntry>[] = [
+    { header: 'Customer', render: (entry) => <span className="font-medium text-slate-800">{entry.customerDisplayName || 'Unknown customer'}</span> },
     { header: 'When', render: (entry) => <span className="text-slate-500">{formatDate(entry.createdAt)}</span> },
     { header: 'Entry', render: (entry) => <span className="text-slate-600">{humanize(entry.entryType)}</span> },
     {

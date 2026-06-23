@@ -309,6 +309,10 @@ export interface VoidTransactionRequest {
 export interface AdminTransactionSummary {
   id: string
   customerId: string
+  customerDisplayName: string
+  storeName: string
+  staffDisplayName: string
+  currencyCode: string
   transactionType: string
   status: string
   amount: number
@@ -343,6 +347,10 @@ export interface AdminCampaign {
 export interface AdminTransaction {
   id: string
   customerId: string
+  customerDisplayName: string
+  storeName: string
+  staffDisplayName: string
+  currencyCode: string
   transactionType: string
   status: string
   amount: number
@@ -476,6 +484,7 @@ export interface AdminProgramDetail {
 export interface AdminLedgerEntry {
   id: string
   customerId: string
+  customerDisplayName: string
   transactionId: string
   entryType: string
   pointsDelta: number

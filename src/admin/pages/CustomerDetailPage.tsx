@@ -8,6 +8,7 @@ import {
   Cake,
   Calendar,
   Check,
+  ChevronRight,
   Coins,
   Copy,
   Hash,
@@ -28,6 +29,7 @@ import { formatDate, formatNumber, humanize, orgStatusTone } from '../lib/format
 import { Button, Card, ErrorState, MetricCard, Skeleton, StateBlock, StatusPill } from '../components/ui/primitives'
 import type { PillTone } from '../components/ui/primitives'
 import { ConfirmDialog } from '../components/ui/Dialog'
+import { DetailDrawer } from '../components/ui/DetailDrawer'
 import type { PlatformCustomerIdentity, PlatformCustomerLedgerEntry, PlatformCustomerOrgAffiliation } from '../types/api'
 
 function BackLink() {
@@ -128,31 +130,60 @@ function LedgerLine({ entry }: { entry: PlatformCustomerLedgerEntry }) {
   )
 }
 
-function MerchantCard({ org }: { org: PlatformCustomerOrgAffiliation }) {
+function RowStat({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="overflow-hidden">
-      <Link
-        to={`/admin/merchants/${org.organizationId}`}
-        className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 transition-colors hover:bg-slate-50"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60">
-            <Store className="size-[18px]" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h3 className="flex items-center gap-1 truncate text-sm font-semibold text-ink">
-              {org.organizationName}
-              <ArrowUpRight className="size-3.5 shrink-0 text-slate-300" aria-hidden />
-            </h3>
-            <p className="text-xs text-slate-400">
-              Enrolled {formatDate(org.enrolledAt)} · Last visit {org.lastVisitAt ? formatDate(org.lastVisitAt) : 'never'}
-            </p>
-          </div>
-        </div>
-        <StatusPill tone={orgStatusTone(org.status)}>{humanize(org.status)}</StatusPill>
-      </Link>
+    <div className="text-right">
+      <p className="mono text-sm font-semibold text-ink">{value}</p>
+      <p className="text-[0.58rem] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+    </div>
+  )
+}
 
-      <div className="grid grid-cols-2 gap-2.5 px-5 py-4 lg:grid-cols-3">
+function MerchantRow({ org, onSelect }: { org: PlatformCustomerOrgAffiliation; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-dark ring-1 ring-inset ring-brand-ring/60">
+        <Store className="size-[17px]" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold text-ink">{org.organizationName}</span>
+          <StatusPill tone={orgStatusTone(org.status)}>{humanize(org.status)}</StatusPill>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-slate-400">
+          {org.loyaltyTier ? `${humanize(org.loyaltyTier)} · ` : ''}Last visit {org.lastVisitAt ? formatDate(org.lastVisitAt) : 'never'}
+        </p>
+      </div>
+      <div className="hidden shrink-0 items-center gap-6 sm:flex">
+        <RowStat label="Points" value={formatNumber(org.currentPoints)} />
+        <RowStat label="Visits" value={formatNumber(org.totalVisits)} />
+        <RowStat label="Spent" value={formatNumber(org.totalSpent)} />
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-slate-300" aria-hidden />
+    </button>
+  )
+}
+
+function MerchantDrawer({ org, onClose }: { org: PlatformCustomerOrgAffiliation; onClose: () => void }) {
+  return (
+    <DetailDrawer
+      open
+      onClose={onClose}
+      title={org.organizationName}
+      subtitle={`Enrolled ${formatDate(org.enrolledAt)} · Last visit ${org.lastVisitAt ? formatDate(org.lastVisitAt) : 'never'}`}
+      status={<StatusPill tone={orgStatusTone(org.status)}>{humanize(org.status)}</StatusPill>}
+      actions={
+        <Link to={`/admin/merchants/${org.organizationId}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-dark hover:underline">
+          Open merchant
+          <ArrowUpRight className="size-4" aria-hidden />
+        </Link>
+      }
+    >
+      <div className="grid grid-cols-2 gap-2.5">
         <OrgMetric icon={<Coins className="size-4" aria-hidden />} label="Points" value={formatNumber(org.currentPoints)} tone="info" />
         <OrgMetric icon={<Award className="size-4" aria-hidden />} label="Tier" value={org.loyaltyTier ? humanize(org.loyaltyTier) : '—'} tone="warning" />
         <OrgMetric icon={<Repeat className="size-4" aria-hidden />} label="Visits" value={formatNumber(org.totalVisits)} />
@@ -161,19 +192,19 @@ function MerchantCard({ org }: { org: PlatformCustomerOrgAffiliation }) {
         <OrgMetric icon={<TrendingDown className="size-4" aria-hidden />} label="Lifetime redeemed" value={formatNumber(org.lifetimePointsRedeemed)} tone="danger" />
       </div>
 
-      <div className="border-t border-slate-100 px-5 py-3">
+      <section>
         <p className="mb-1 text-[0.7rem] font-semibold uppercase tracking-wider text-slate-400">Recent activity</p>
         {org.recentLedger.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-3 text-center text-xs text-slate-400">No recent activity</p>
         ) : (
-          <ul>
+          <ul className="rounded-xl border border-slate-200/70 bg-white px-2 py-1 shadow-card">
             {org.recentLedger.map((entry) => (
               <LedgerLine key={entry.id} entry={entry} />
             ))}
           </ul>
         )}
-      </div>
-    </Card>
+      </section>
+    </DetailDrawer>
   )
 }
 
@@ -226,6 +257,7 @@ export function CustomerDetailPage() {
   const { data, isLoading, isError, error, refetch } = useGlobalCustomer(customerId)
   const deleteCustomer = useDeleteGlobalCustomer()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null)
 
   if (isError) {
     return (
@@ -256,6 +288,7 @@ export function CustomerDetailPage() {
   const name = `${customer.firstName} ${customer.lastName}`.trim()
   const totals = totalsOf(data.organizations)
   const age = ageFrom(customer.birthDate)
+  const selectedOrg = data.organizations.find((org) => org.organizationId === selectedOrgId) ?? null
 
   return (
     <>
@@ -306,14 +339,16 @@ export function CustomerDetailPage() {
           {data.organizations.length === 0 ? (
             <StateBlock icon={<Store className="size-6" aria-hidden />} title="No merchant cards" subtitle="This customer is not enrolled with any merchant yet." />
           ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Card className="overflow-hidden">
               {data.organizations.map((org) => (
-                <MerchantCard key={org.organizationId} org={org} />
+                <MerchantRow key={org.organizationId} org={org} onSelect={() => setSelectedOrgId(org.organizationId)} />
               ))}
-            </div>
+            </Card>
           )}
         </section>
       </div>
+
+      {selectedOrg ? <MerchantDrawer org={selectedOrg} onClose={() => setSelectedOrgId(null)} /> : null}
 
       <ConfirmDialog
         open={confirmingDelete}
