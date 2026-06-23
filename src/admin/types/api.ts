@@ -579,6 +579,7 @@ export interface ModerationCardDesign {
   cardName: string
   logoUrl: string
   cardBackgroundUrl: string
+  cardImageUrl: string
   primaryColor: string
   secondaryColor: string
   updatedAt: string

@@ -172,6 +172,15 @@ function CardDesignsQueue({ query }: QueueProps<ModerationCardDesign>) {
 }
 
 function CardPreview({ design }: { design: ModerationCardDesign }) {
+  if (design.cardImageUrl) {
+    return (
+      <img
+        src={design.cardImageUrl}
+        alt={`${design.cardName} card design`}
+        className="aspect-[1.6/1] w-full rounded-2xl object-cover shadow-inner"
+      />
+    )
+  }
   const background = design.cardBackgroundUrl
     ? { backgroundImage: `url(${design.cardBackgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : { background: `linear-gradient(135deg, ${design.primaryColor || '#15803d'}, ${design.secondaryColor || '#0b5d45'})` }
