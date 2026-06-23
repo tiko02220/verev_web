@@ -20,6 +20,8 @@ import type {
   AdminTransaction,
   AdminTransactionDetail,
   AdminTransactionSummary,
+  AdminLoyaltyPointsSettings,
+  AdminUpdateLoyaltyPointsSettingsRequest,
   AdminUpdateProgramConfigRequest,
   AdminUpdateRewardRequest,
   CreateProgramRequest,
@@ -524,5 +526,30 @@ export function useUpdateProgramConfig(organizationId: string) {
     mutationFn: ({ programId, request }: { programId: string; request: AdminUpdateProgramConfigRequest }) =>
       api.put<AdminProgramResponseModel>('/v1/admin/organizations/program/config', request, { organizationId, programId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-programs', organizationId] }),
+  })
+}
+
+export function useLoyaltySettings(organizationId: string) {
+  return useQuery({
+    queryKey: ['merchant-loyalty-settings', organizationId],
+    queryFn: () => api.get<AdminLoyaltyPointsSettings>('/v1/admin/organizations/loyalty-settings', { organizationId }),
+  })
+}
+
+export function useUpdateLoyaltySettings(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: AdminUpdateLoyaltyPointsSettingsRequest) =>
+      api.put<AdminLoyaltyPointsSettings>('/v1/admin/organizations/loyalty-settings', request, { organizationId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-loyalty-settings', organizationId] }),
+  })
+}
+
+export function useSetLoyaltySettingsEnabled(organizationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ enabled }: { enabled: boolean }) =>
+      api.post<AdminLoyaltyPointsSettings>(`/v1/admin/organizations/loyalty-settings/${enabled ? 'enable' : 'disable'}`, undefined, { organizationId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['merchant-loyalty-settings', organizationId] }),
   })
 }

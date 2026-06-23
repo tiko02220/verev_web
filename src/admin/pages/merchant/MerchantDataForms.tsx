@@ -12,21 +12,26 @@ import {
   useProgramDetail,
   useRewardDetail,
   useUpdateCampaignFull,
+  useUpdateLoyaltySettings,
   useUpdateProgramConfig,
   useUpdateReward,
 } from '../../api/merchants'
 import { Button, Spinner, Switch, TextField } from '../../components/ui/primitives'
 import { Modal } from '../../components/ui/Dialog'
-import { PROGRAM_SCOPES, PROGRAM_TYPES, TIER_THRESHOLD_BASES } from '../../types/api'
+import { programConfigError } from './programForm'
+import type { ProgramTypeConfig } from './programForm'
+import { PROGRAM_SCOPES, PROGRAM_TYPES, PURCHASE_FREQUENCY_BASES, TIER_THRESHOLD_BASES } from '../../types/api'
 import type {
   AdminCampaign,
   AdminCampaignDetail,
   AdminCampaignFullRequest,
   AdminCreateRewardRequest,
+  AdminLoyaltyPointsSettings,
   AdminProgram,
   AdminProgramDetail,
   AdminRewardDetail,
   AdminRewardSummary,
+  AdminUpdateLoyaltyPointsSettingsRequest,
   AdminUpdateProgramConfigRequest,
   AdminUpdateRewardRequest,
 } from '../../types/api'
@@ -83,7 +88,7 @@ function SelectField({ label, value, options, onChange }: { label: string; value
   )
 }
 
-function StoreSelectField({ merchantId, value, onChange }: { merchantId: string; value: string; onChange: (value: string) => void }) {
+export function StoreSelectField({ merchantId, value, onChange }: { merchantId: string; value: string; onChange: (value: string) => void }) {
   const { data } = useMerchantStores(merchantId)
   const stores = data ?? []
   return (
@@ -154,6 +159,61 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 function FormError({ text }: { text: string | null }) {
   if (!text) return null
   return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{text}</p>
+}
+
+export function ProgramTypeFields<T extends ProgramTypeConfig>({
+  form,
+  set,
+  numberMin,
+}: {
+  form: T
+  set: <K extends keyof T>(field: K, value: T[K]) => void
+  numberMin: boolean
+}) {
+  const min = numberMin ? 0 : undefined
+  if (form.type === 'TIER') {
+    return (
+      <>
+        <SelectField label="Threshold basis" value={form.tierThresholdBasis} options={TIER_THRESHOLD_BASES} onChange={(value) => set('tierThresholdBasis', value as T['tierThresholdBasis'])} />
+        <NumberField label="Silver threshold" value={form.tierSilverThreshold} min={min} onChange={(value) => set('tierSilverThreshold', value as T['tierSilverThreshold'])} />
+        <NumberField label="Gold threshold" value={form.tierGoldThreshold} min={min} onChange={(value) => set('tierGoldThreshold', value as T['tierGoldThreshold'])} />
+        <NumberField label="VIP threshold" value={form.tierVipThreshold} min={min} onChange={(value) => set('tierVipThreshold', value as T['tierVipThreshold'])} />
+      </>
+    )
+  }
+  if (form.type === 'DIGITAL_STAMP') {
+    return (
+      <>
+        <NumberField label="Visits required" value={form.checkInVisitsRequired} min={min} onChange={(value) => set('checkInVisitsRequired', value as T['checkInVisitsRequired'])} />
+        <NumberField label="Reward points" value={form.checkInRewardPoints} min={min} onChange={(value) => set('checkInRewardPoints', value as T['checkInRewardPoints'])} />
+        <TextField label="Reward name" value={form.checkInRewardName} onChange={(event) => set('checkInRewardName', event.target.value as T['checkInRewardName'])} />
+      </>
+    )
+  }
+  if (form.type === 'PURCHASE_FREQUENCY') {
+    return (
+      <>
+        <SelectField label="Frequency basis" value={form.purchaseFrequencyBasis} options={PURCHASE_FREQUENCY_BASES} onChange={(value) => set('purchaseFrequencyBasis', value as T['purchaseFrequencyBasis'])} />
+        {form.purchaseFrequencyBasis === 'COUNT' ? (
+          <NumberField label="Purchase count" value={form.purchaseFrequencyCount} min={min} onChange={(value) => set('purchaseFrequencyCount', value as T['purchaseFrequencyCount'])} />
+        ) : (
+          <NumberField label="Spend target" value={form.purchaseFrequencySpendTarget} min={min} onChange={(value) => set('purchaseFrequencySpendTarget', value as T['purchaseFrequencySpendTarget'])} />
+        )}
+        <NumberField label="Window (days)" value={form.purchaseFrequencyWindowDays} min={min} onChange={(value) => set('purchaseFrequencyWindowDays', value as T['purchaseFrequencyWindowDays'])} />
+        <NumberField label="Reward points" value={form.purchaseFrequencyRewardPoints} min={min} onChange={(value) => set('purchaseFrequencyRewardPoints', value as T['purchaseFrequencyRewardPoints'])} />
+      </>
+    )
+  }
+  if (form.type === 'REFERRAL') {
+    return (
+      <>
+        <NumberField label="Referrer reward points" value={form.referralReferrerRewardPoints} min={min} onChange={(value) => set('referralReferrerRewardPoints', value as T['referralReferrerRewardPoints'])} />
+        <NumberField label="Referee reward points" value={form.referralRefereeRewardPoints} min={min} onChange={(value) => set('referralRefereeRewardPoints', value as T['referralRefereeRewardPoints'])} />
+        <TextField label="Referral code prefix" value={form.referralCodePrefix} onChange={(event) => set('referralCodePrefix', event.target.value as T['referralCodePrefix'])} placeholder="e.g. VRV" />
+      </>
+    )
+  }
+  return null
 }
 
 const EMPTY_REWARD: AdminCreateRewardRequest = {
@@ -708,8 +768,9 @@ export function GiveawayFormDialog({
 const EMPTY_PROGRAM_CONFIG: AdminUpdateProgramConfigRequest = {
   expectedVersion: 0,
   name: '',
+  description: '',
   type: 'DIGITAL_STAMP',
-  scope: 'BRANCH',
+  scope: 'GLOBAL',
   active: true,
   tierSilverThreshold: 0,
   tierGoldThreshold: 0,
@@ -718,11 +779,14 @@ const EMPTY_PROGRAM_CONFIG: AdminUpdateProgramConfigRequest = {
   checkInVisitsRequired: 0,
   checkInRewardPoints: 0,
   checkInRewardName: '',
+  purchaseFrequencyBasis: 'COUNT',
   purchaseFrequencyCount: 0,
+  purchaseFrequencySpendTarget: 0,
   purchaseFrequencyWindowDays: 0,
   purchaseFrequencyRewardPoints: 0,
   referralReferrerRewardPoints: 0,
   referralRefereeRewardPoints: 0,
+  referralCodePrefix: '',
   storeId: null,
 }
 
@@ -730,6 +794,7 @@ function programDetailToConfigForm(program: AdminProgramDetail): AdminUpdateProg
   return {
     expectedVersion: program.version,
     name: program.name,
+    description: program.description,
     type: program.type,
     scope: program.scope === 'GLOBAL' ? 'GLOBAL' : 'BRANCH',
     active: program.active,
@@ -740,11 +805,14 @@ function programDetailToConfigForm(program: AdminProgramDetail): AdminUpdateProg
     checkInVisitsRequired: program.checkInVisitsRequired,
     checkInRewardPoints: program.checkInRewardPoints,
     checkInRewardName: program.checkInRewardName,
+    purchaseFrequencyBasis: program.purchaseFrequencyBasis || 'COUNT',
     purchaseFrequencyCount: program.purchaseFrequencyCount,
+    purchaseFrequencySpendTarget: program.purchaseFrequencySpendTarget,
     purchaseFrequencyWindowDays: program.purchaseFrequencyWindowDays,
     purchaseFrequencyRewardPoints: program.purchaseFrequencyRewardPoints,
     referralReferrerRewardPoints: program.referralReferrerRewardPoints,
     referralRefereeRewardPoints: program.referralRefereeRewardPoints,
+    referralCodePrefix: program.referralCodePrefix,
     storeId: program.storeId,
   }
 }
@@ -773,17 +841,38 @@ export function ProgramConfigDialog({
   }
 
   function set<K extends keyof AdminUpdateProgramConfigRequest>(field: K, value: AdminUpdateProgramConfigRequest[K]) {
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+      if (field === 'type' && value === 'TIER') {
+        next.scope = 'GLOBAL'
+        next.storeId = null
+      }
+      return next
+    })
   }
 
   const loadingDetail = program !== null && detailQuery.isLoading
-  const canSubmit = form.name.trim().length > 0 && (form.scope !== 'BRANCH' || Boolean(form.storeId))
+  const isTier = form.type === 'TIER'
+  const validation = programConfigError(form)
 
   function save() {
-    if (!program || !canSubmit) return
+    if (!program || validation) {
+      setErrorText(validation)
+      return
+    }
     setErrorText(null)
+    const branchScoped = !isTier && form.scope === 'BRANCH'
     mutation.mutate(
-      { programId: program.id, request: { ...form, name: form.name.trim(), storeId: form.scope === 'BRANCH' ? form.storeId : null } },
+      {
+        programId: program.id,
+        request: {
+          ...form,
+          name: form.name.trim(),
+          referralCodePrefix: form.referralCodePrefix.trim(),
+          scope: isTier ? 'GLOBAL' : form.scope,
+          storeId: branchScoped ? form.storeId : null,
+        },
+      },
       { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Update failed')) },
     )
   }
@@ -798,7 +887,7 @@ export function ProgramConfigDialog({
           <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
-          <Button isLoading={mutation.isPending} disabled={!canSubmit || loadingDetail} onClick={save}>
+          <Button isLoading={mutation.isPending} disabled={validation !== null || loadingDetail} onClick={save}>
             Save changes
           </Button>
         </>
@@ -811,48 +900,141 @@ export function ProgramConfigDialog({
       ) : (
       <div className="flex flex-col gap-3">
         <TextField label="Name" value={form.name} onChange={(event) => set('name', event.target.value)} />
+        <TextField label="Description" value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Optional" />
         <SelectField label="Type" value={form.type} options={PROGRAM_TYPES} onChange={(value) => set('type', value)} />
-        <SelectField label="Scope" value={form.scope} options={PROGRAM_SCOPES} onChange={(value) => set('scope', value)} />
-        {form.scope === 'BRANCH' ? (
-          <StoreSelectField merchantId={merchantId} value={form.storeId ?? ''} onChange={(value) => set('storeId', value || null)} />
-        ) : null}
+        {isTier ? null : (
+          <>
+            <SelectField label="Scope" value={form.scope} options={PROGRAM_SCOPES} onChange={(value) => set('scope', value)} />
+            {form.scope === 'BRANCH' ? (
+              <StoreSelectField merchantId={merchantId} value={form.storeId ?? ''} onChange={(value) => set('storeId', value || null)} />
+            ) : null}
+          </>
+        )}
         <ToggleRow label="Active" checked={form.active} onChange={(checked) => set('active', checked)} />
 
-        {form.type === 'TIER' ? (
-          <>
-            <NumberField label="Silver threshold" value={form.tierSilverThreshold} min={0} onChange={(value) => set('tierSilverThreshold', value)} />
-            <NumberField label="Gold threshold" value={form.tierGoldThreshold} min={0} onChange={(value) => set('tierGoldThreshold', value)} />
-            <NumberField label="VIP threshold" value={form.tierVipThreshold} min={0} onChange={(value) => set('tierVipThreshold', value)} />
-            <SelectField label="Threshold basis" value={form.tierThresholdBasis} options={TIER_THRESHOLD_BASES} onChange={(value) => set('tierThresholdBasis', value)} />
-          </>
-        ) : null}
-
-        {form.type === 'DIGITAL_STAMP' ? (
-          <>
-            <NumberField label="Visits required" value={form.checkInVisitsRequired} min={0} onChange={(value) => set('checkInVisitsRequired', value)} />
-            <NumberField label="Reward points" value={form.checkInRewardPoints} min={0} onChange={(value) => set('checkInRewardPoints', value)} />
-            <TextField label="Reward name" value={form.checkInRewardName} onChange={(event) => set('checkInRewardName', event.target.value)} />
-          </>
-        ) : null}
-
-        {form.type === 'PURCHASE_FREQUENCY' ? (
-          <>
-            <NumberField label="Purchase count" value={form.purchaseFrequencyCount} min={0} onChange={(value) => set('purchaseFrequencyCount', value)} />
-            <NumberField label="Window (days)" value={form.purchaseFrequencyWindowDays} min={0} onChange={(value) => set('purchaseFrequencyWindowDays', value)} />
-            <NumberField label="Reward points" value={form.purchaseFrequencyRewardPoints} min={0} onChange={(value) => set('purchaseFrequencyRewardPoints', value)} />
-          </>
-        ) : null}
-
-        {form.type === 'REFERRAL' ? (
-          <>
-            <NumberField label="Referrer reward points" value={form.referralReferrerRewardPoints} min={0} onChange={(value) => set('referralReferrerRewardPoints', value)} />
-            <NumberField label="Referee reward points" value={form.referralRefereeRewardPoints} min={0} onChange={(value) => set('referralRefereeRewardPoints', value)} />
-          </>
-        ) : null}
+        <ProgramTypeFields form={form} set={set} numberMin />
 
         <FormError text={errorText} />
       </div>
       )}
+    </Modal>
+  )
+}
+
+interface LoyaltyPointsForm {
+  pointsSpendStepAmount: number
+  pointsAwardedPerStep: number
+  pointsWelcomeBonus: number
+  pointsMinimumRedeem: number
+  pointsExpiryMonths: number
+  pointsPerCurrencyUnit: number
+}
+
+const EMPTY_LOYALTY_POINTS: LoyaltyPointsForm = {
+  pointsSpendStepAmount: 0,
+  pointsAwardedPerStep: 0,
+  pointsWelcomeBonus: 0,
+  pointsMinimumRedeem: 0,
+  pointsExpiryMonths: 0,
+  pointsPerCurrencyUnit: 1,
+}
+
+function loyaltySettingsToForm(settings: AdminLoyaltyPointsSettings): LoyaltyPointsForm {
+  return {
+    pointsSpendStepAmount: settings.pointsSpendStepAmount,
+    pointsAwardedPerStep: settings.pointsAwardedPerStep,
+    pointsWelcomeBonus: settings.pointsWelcomeBonus,
+    pointsMinimumRedeem: settings.pointsMinimumRedeem,
+    pointsExpiryMonths: settings.pointsExpiryMonths,
+    pointsPerCurrencyUnit: settings.pointsPerCurrencyUnit,
+  }
+}
+
+function loyaltyPointsError(form: LoyaltyPointsForm): string | null {
+  if (form.pointsSpendStepAmount <= 0) return 'Spend step must be greater than zero.'
+  if (form.pointsAwardedPerStep <= 0) return 'Points per step must be greater than zero.'
+  if (form.pointsMinimumRedeem <= 0) return 'Minimum redeem must be greater than zero.'
+  if (form.pointsPerCurrencyUnit < 1) return 'Points per currency unit must be at least 1.'
+  if (form.pointsWelcomeBonus < 0) return 'Welcome bonus cannot be negative.'
+  if (form.pointsExpiryMonths < 0) return 'Expiry months cannot be negative.'
+  return null
+}
+
+export function LoyaltyPointsDialog({
+  merchantId,
+  open,
+  settings,
+  onClose,
+}: {
+  merchantId: string
+  open: boolean
+  settings: AdminLoyaltyPointsSettings | null
+  onClose: () => void
+}) {
+  const mutation = useUpdateLoyaltySettings(merchantId)
+  const [form, setForm] = useState<LoyaltyPointsForm>(EMPTY_LOYALTY_POINTS)
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
+
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) {
+      setForm(settings && settings.configured ? loyaltySettingsToForm(settings) : EMPTY_LOYALTY_POINTS)
+      setErrorText(null)
+    }
+  }
+
+  function set<K extends keyof LoyaltyPointsForm>(field: K, value: LoyaltyPointsForm[K]) {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const validation = loyaltyPointsError(form)
+
+  function save() {
+    if (validation) {
+      setErrorText(validation)
+      return
+    }
+    setErrorText(null)
+    const request: AdminUpdateLoyaltyPointsSettingsRequest = {
+      expectedVersion: settings?.version ?? 0,
+      pointsSpendStepAmount: form.pointsSpendStepAmount,
+      pointsAwardedPerStep: form.pointsAwardedPerStep,
+      pointsWelcomeBonus: form.pointsWelcomeBonus,
+      pointsMinimumRedeem: form.pointsMinimumRedeem,
+      pointsExpiryMonths: form.pointsExpiryMonths,
+      pointsPerCurrencyUnit: form.pointsPerCurrencyUnit,
+    }
+    mutation.mutate(request, { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Save failed')) })
+  }
+
+  const isSetup = !settings || !settings.configured
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isSetup ? 'Set up points system' : 'Edit points system'}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <Button isLoading={mutation.isPending} disabled={validation !== null} onClick={save}>
+            {isSetup ? 'Enable points system' : 'Save changes'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <NumberField label="Spend step amount" value={form.pointsSpendStepAmount} min={1} onChange={(value) => set('pointsSpendStepAmount', value)} />
+        <NumberField label="Points awarded per step" value={form.pointsAwardedPerStep} min={1} onChange={(value) => set('pointsAwardedPerStep', value)} />
+        <NumberField label="Points per currency unit" value={form.pointsPerCurrencyUnit} min={1} onChange={(value) => set('pointsPerCurrencyUnit', value)} />
+        <NumberField label="Minimum redeem" value={form.pointsMinimumRedeem} min={1} onChange={(value) => set('pointsMinimumRedeem', value)} />
+        <NumberField label="Welcome bonus" value={form.pointsWelcomeBonus} min={0} onChange={(value) => set('pointsWelcomeBonus', value)} />
+        <NumberField label="Expiry months (0 = never)" value={form.pointsExpiryMonths} min={0} onChange={(value) => set('pointsExpiryMonths', value)} />
+        <FormError text={errorText} />
+      </div>
     </Modal>
   )
 }

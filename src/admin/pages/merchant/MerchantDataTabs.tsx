@@ -6,6 +6,7 @@ import {
   Boxes,
   Check,
   ChevronRight,
+  Coins,
   Copy,
   CreditCard,
   Gift,
@@ -31,12 +32,14 @@ import {
   useMerchantBilling,
   useMerchantCampaigns,
   useMerchantLedger,
+  useLoyaltySettings,
   useMerchantPrograms,
   useMerchantRewards,
   useMerchantTransactionDetail,
   useMerchantTransactions,
   useRenameProgram,
   useSetCampaignActive,
+  useSetLoyaltySettingsEnabled,
   useSetProgramActive,
   useSetRewardActive,
   useVoidTransaction,
@@ -49,7 +52,7 @@ import { ConfirmDialog, Modal } from '../../components/ui/Dialog'
 import { SimpleTable } from '../../components/ui/SimpleTable'
 import type { SimpleColumn } from '../../components/ui/SimpleTable'
 import { DetailDrawer, DetailRow, DetailSection } from '../../components/ui/DetailDrawer'
-import { PROGRAM_SCOPES, PROGRAM_TYPES, TIER_THRESHOLD_BASES } from '../../types/api'
+import { PROGRAM_SCOPES, PROGRAM_TYPES } from '../../types/api'
 import type {
   AdminApproval,
   AdminCampaign,
@@ -60,7 +63,16 @@ import type {
   BillingInvoice,
   CreateProgramRequest,
 } from '../../types/api'
-import { GiveawayFormDialog, ProgramConfigDialog, RewardFormDialog, RewardInventoryDialog } from './MerchantDataForms'
+import {
+  GiveawayFormDialog,
+  LoyaltyPointsDialog,
+  ProgramConfigDialog,
+  ProgramTypeFields,
+  RewardFormDialog,
+  RewardInventoryDialog,
+  StoreSelectField,
+} from './MerchantDataForms'
+import { programConfigError } from './programForm'
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback
@@ -213,6 +225,91 @@ function chevronColumn<T>(): SimpleColumn<T> {
   return { header: '', align: 'right', render: () => <ChevronRight className="ml-auto size-4 text-slate-300" aria-hidden /> }
 }
 
+function PointsValueRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-0">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="mono text-sm font-medium text-slate-800">{value}</span>
+    </div>
+  )
+}
+
+function PointsSystemSection({ merchantId, canManage }: { merchantId: string; canManage: boolean }) {
+  const { data, isLoading, isError, error, refetch } = useLoyaltySettings(merchantId)
+  const setEnabled = useSetLoyaltySettingsEnabled(merchantId)
+  const [editing, setEditing] = useState(false)
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <Coins className="size-4" aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Points system</h2>
+            <p className="text-xs text-slate-400">Org-level loyalty points earning and redemption</p>
+          </div>
+        </div>
+        {data && data.configured ? (
+          <div className="flex items-center gap-3">
+            <StatusPill tone={data.enabled ? 'success' : 'neutral'}>{data.enabled ? 'Enabled' : 'Disabled'}</StatusPill>
+            {canManage ? (
+              <Switch
+                checked={data.enabled}
+                disabled={setEnabled.isPending}
+                onChange={(enabled) => setEnabled.mutate({ enabled })}
+                label="Points system enabled"
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-4">
+        {isLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : isError ? (
+          <ErrorState message={error instanceof Error ? error.message : 'Failed to load points system'} onRetry={() => refetch()} />
+        ) : !data || !data.configured ? (
+          <StateBlock
+            icon={<Coins className="size-6" aria-hidden />}
+            title="No points system configured"
+            subtitle="Set up org-level points to start earning and redemption."
+            action={
+              canManage ? (
+                <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
+                  Set up points system
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+              <PointsValueRow label="Spend step amount" value={formatNumber(data.pointsSpendStepAmount)} />
+              <PointsValueRow label="Points per step" value={formatNumber(data.pointsAwardedPerStep)} />
+              <PointsValueRow label="Points per currency unit" value={formatNumber(data.pointsPerCurrencyUnit)} />
+              <PointsValueRow label="Minimum redeem" value={formatNumber(data.pointsMinimumRedeem)} />
+              <PointsValueRow label="Welcome bonus" value={formatNumber(data.pointsWelcomeBonus)} />
+              <PointsValueRow label="Expiry" value={data.pointsExpiryMonths === 0 ? 'Never expires' : `${formatNumber(data.pointsExpiryMonths)} months`} />
+            </div>
+            {canManage ? (
+              <div className="mt-4 flex justify-end">
+                <Button variant="secondary" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      <LoyaltyPointsDialog merchantId={merchantId} open={editing} settings={data ?? null} onClose={() => setEditing(false)} />
+    </Card>
+  )
+}
+
 export function ProgramsTab({ merchantId }: { merchantId: string }) {
   const { admin } = useAdminAuth()
   const canManage = admin ? can(admin.role, 'merchants.config') : false
@@ -242,6 +339,7 @@ export function ProgramsTab({ merchantId }: { merchantId: string }) {
   ]
   return (
     <div className="space-y-4">
+      <PointsSystemSection merchantId={merchantId} canManage={canManage} />
       <DataTabHeader
         title="Programs"
         count={rows.length}
@@ -370,8 +468,9 @@ export function ProgramsTab({ merchantId }: { merchantId: string }) {
 
 const EMPTY_PROGRAM_FORM: CreateProgramRequest = {
   name: '',
+  description: '',
   type: 'DIGITAL_STAMP',
-  scope: 'BRANCH',
+  scope: 'GLOBAL',
   active: true,
   tierSilverThreshold: 0,
   tierGoldThreshold: 0,
@@ -380,27 +479,15 @@ const EMPTY_PROGRAM_FORM: CreateProgramRequest = {
   checkInVisitsRequired: 0,
   checkInRewardPoints: 0,
   checkInRewardName: '',
+  purchaseFrequencyBasis: 'COUNT',
   purchaseFrequencyCount: 0,
+  purchaseFrequencySpendTarget: 0,
   purchaseFrequencyWindowDays: 0,
   purchaseFrequencyRewardPoints: 0,
   referralReferrerRewardPoints: 0,
   referralRefereeRewardPoints: 0,
+  referralCodePrefix: '',
   storeId: '',
-}
-
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (next: number) => void }) {
-  return (
-    <TextField
-      label={label}
-      type="number"
-      inputMode="numeric"
-      value={value === 0 ? '' : String(value)}
-      onChange={(event) => {
-        const parsed = Number.parseInt(event.target.value, 10)
-        onChange(Number.isInteger(parsed) ? parsed : 0)
-      }}
-    />
-  )
 }
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void }) {
@@ -437,15 +524,36 @@ function ProgramCreateDialog({ merchantId, open, onClose }: { merchantId: string
   }
 
   function set<K extends keyof CreateProgramRequest>(key: K, value: CreateProgramRequest[K]) {
-    setForm((current) => ({ ...current, [key]: value }))
+    setForm((current) => {
+      const next = { ...current, [key]: value }
+      if (key === 'type' && value === 'TIER') {
+        next.scope = 'GLOBAL'
+        next.storeId = ''
+      }
+      return next
+    })
   }
 
-  const canSubmit = form.name.trim().length > 0
+  const isTier = form.type === 'TIER'
+  const validation = programConfigError({ ...form, storeId: form.storeId || null })
 
   function save() {
-    if (!canSubmit) return
+    if (validation) {
+      setErrorText(validation)
+      return
+    }
     setErrorText(null)
-    mutation.mutate(form, { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Create failed')) })
+    const branchScoped = !isTier && form.scope === 'BRANCH'
+    mutation.mutate(
+      {
+        ...form,
+        name: form.name.trim(),
+        referralCodePrefix: form.referralCodePrefix.trim(),
+        scope: isTier ? 'GLOBAL' : form.scope,
+        storeId: branchScoped ? form.storeId : '',
+      },
+      { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Create failed')) },
+    )
   }
 
   return (
@@ -458,7 +566,7 @@ function ProgramCreateDialog({ merchantId, open, onClose }: { merchantId: string
           <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
-          <Button isLoading={mutation.isPending} disabled={!canSubmit} onClick={save}>
+          <Button isLoading={mutation.isPending} disabled={validation !== null} onClick={save}>
             Create program
           </Button>
         </>
@@ -466,45 +574,23 @@ function ProgramCreateDialog({ merchantId, open, onClose }: { merchantId: string
     >
       <div className="flex flex-col gap-3">
         <TextField label="Name" value={form.name} onChange={(event) => set('name', event.target.value)} />
+        <TextField label="Description" value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Optional" />
         <SelectField label="Type" value={form.type} options={PROGRAM_TYPES} onChange={(value) => set('type', value)} />
-        <SelectField label="Scope" value={form.scope} options={PROGRAM_SCOPES} onChange={(value) => set('scope', value)} />
+        {isTier ? null : (
+          <>
+            <SelectField label="Scope" value={form.scope} options={PROGRAM_SCOPES} onChange={(value) => set('scope', value)} />
+            {form.scope === 'BRANCH' ? (
+              <StoreSelectField merchantId={merchantId} value={form.storeId} onChange={(value) => set('storeId', value)} />
+            ) : null}
+          </>
+        )}
 
         <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
           <span className="text-sm font-medium text-slate-700">Active on creation</span>
           <Switch checked={form.active} onChange={(checked) => set('active', checked)} />
         </div>
 
-        {form.type === 'TIER' ? (
-          <>
-            <NumberField label="Silver threshold" value={form.tierSilverThreshold} onChange={(value) => set('tierSilverThreshold', value)} />
-            <NumberField label="Gold threshold" value={form.tierGoldThreshold} onChange={(value) => set('tierGoldThreshold', value)} />
-            <NumberField label="VIP threshold" value={form.tierVipThreshold} onChange={(value) => set('tierVipThreshold', value)} />
-            <SelectField label="Threshold basis" value={form.tierThresholdBasis} options={TIER_THRESHOLD_BASES} onChange={(value) => set('tierThresholdBasis', value)} />
-          </>
-        ) : null}
-
-        {form.type === 'DIGITAL_STAMP' ? (
-          <>
-            <NumberField label="Visits required" value={form.checkInVisitsRequired} onChange={(value) => set('checkInVisitsRequired', value)} />
-            <NumberField label="Reward points" value={form.checkInRewardPoints} onChange={(value) => set('checkInRewardPoints', value)} />
-            <TextField label="Reward name" value={form.checkInRewardName} onChange={(event) => set('checkInRewardName', event.target.value)} />
-          </>
-        ) : null}
-
-        {form.type === 'PURCHASE_FREQUENCY' ? (
-          <>
-            <NumberField label="Purchase count" value={form.purchaseFrequencyCount} onChange={(value) => set('purchaseFrequencyCount', value)} />
-            <NumberField label="Window (days)" value={form.purchaseFrequencyWindowDays} onChange={(value) => set('purchaseFrequencyWindowDays', value)} />
-            <NumberField label="Reward points" value={form.purchaseFrequencyRewardPoints} onChange={(value) => set('purchaseFrequencyRewardPoints', value)} />
-          </>
-        ) : null}
-
-        {form.type === 'REFERRAL' ? (
-          <>
-            <NumberField label="Referrer reward points" value={form.referralReferrerRewardPoints} onChange={(value) => set('referralReferrerRewardPoints', value)} />
-            <NumberField label="Referee reward points" value={form.referralRefereeRewardPoints} onChange={(value) => set('referralRefereeRewardPoints', value)} />
-          </>
-        ) : null}
+        <ProgramTypeFields form={form} set={set} numberMin={false} />
 
         {errorText ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
       </div>

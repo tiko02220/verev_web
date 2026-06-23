@@ -152,8 +152,12 @@ export type ProgramScope = (typeof PROGRAM_SCOPES)[number]
 export const TIER_THRESHOLD_BASES = ['POINTS', 'SPEND'] as const
 export type TierThresholdBasis = (typeof TIER_THRESHOLD_BASES)[number]
 
+export const PURCHASE_FREQUENCY_BASES = ['COUNT', 'SPEND'] as const
+export type PurchaseFrequencyBasis = (typeof PURCHASE_FREQUENCY_BASES)[number]
+
 export interface CreateProgramRequest {
   name: string
+  description: string
   type: string
   scope: string
   active: boolean
@@ -164,11 +168,14 @@ export interface CreateProgramRequest {
   checkInVisitsRequired: number
   checkInRewardPoints: number
   checkInRewardName: string
+  purchaseFrequencyBasis: string
   purchaseFrequencyCount: number
+  purchaseFrequencySpendTarget: number
   purchaseFrequencyWindowDays: number
   purchaseFrequencyRewardPoints: number
   referralReferrerRewardPoints: number
   referralRefereeRewardPoints: number
+  referralCodePrefix: string
   storeId: string
 }
 
@@ -284,6 +291,7 @@ export interface AdminCampaignFullRequest {
 export interface AdminUpdateProgramConfigRequest {
   expectedVersion: number
   name: string
+  description: string
   type: string
   scope: string
   active: boolean
@@ -294,12 +302,38 @@ export interface AdminUpdateProgramConfigRequest {
   checkInVisitsRequired: number
   checkInRewardPoints: number
   checkInRewardName: string
+  purchaseFrequencyBasis: string
   purchaseFrequencyCount: number
+  purchaseFrequencySpendTarget: number
   purchaseFrequencyWindowDays: number
   purchaseFrequencyRewardPoints: number
   referralReferrerRewardPoints: number
   referralRefereeRewardPoints: number
+  referralCodePrefix: string
   storeId: string | null
+}
+
+export interface AdminLoyaltyPointsSettings {
+  organizationId: string
+  enabled: boolean
+  configured: boolean
+  pointsSpendStepAmount: number
+  pointsAwardedPerStep: number
+  pointsWelcomeBonus: number
+  pointsMinimumRedeem: number
+  pointsExpiryMonths: number
+  pointsPerCurrencyUnit: number
+  version: number
+}
+
+export interface AdminUpdateLoyaltyPointsSettingsRequest {
+  expectedVersion: number
+  pointsSpendStepAmount: number
+  pointsAwardedPerStep: number
+  pointsWelcomeBonus: number
+  pointsMinimumRedeem: number
+  pointsExpiryMonths: number
+  pointsPerCurrencyUnit: number
 }
 
 export interface VoidTransactionRequest {
@@ -460,6 +494,7 @@ export interface AdminCampaignDetail {
 export interface AdminProgramDetail {
   id: string
   name: string
+  description: string
   type: string
   scope: string
   storeId: string | null
@@ -473,11 +508,14 @@ export interface AdminProgramDetail {
   checkInVisitsRequired: number
   checkInRewardPoints: number
   checkInRewardName: string
+  purchaseFrequencyBasis: string
   purchaseFrequencyCount: number
+  purchaseFrequencySpendTarget: number
   purchaseFrequencyWindowDays: number
   purchaseFrequencyRewardPoints: number
   referralReferrerRewardPoints: number
   referralRefereeRewardPoints: number
+  referralCodePrefix: string
   version: number
 }
 
