@@ -70,7 +70,7 @@ import { ConfirmDialog, Modal } from '../components/ui/Dialog'
 import { SimpleTable } from '../components/ui/SimpleTable'
 import type { SimpleColumn } from '../components/ui/SimpleTable'
 import { DetailDrawer, DetailRow, DetailSection } from '../components/ui/DetailDrawer'
-import { ProgramsTab, RewardsTab, CampaignsTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
+import { ProgramsTab, RewardsTab, AdvertisingTab, TransactionsTab, LedgerTab, BillingTab, ApprovalsTab } from './merchant/MerchantDataTabs'
 import { ApiError } from '../lib/apiClient'
 import { STAFF_ROLES } from '../types/api'
 import type {
@@ -96,7 +96,7 @@ const TABS = [
   { key: 'customers', label: 'Customers' },
   { key: 'programs', label: 'Programs' },
   { key: 'rewards', label: 'Rewards' },
-  { key: 'campaigns', label: 'Promotions' },
+  { key: 'advertising', label: 'Advertising' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'ledger', label: 'Ledger' },
   { key: 'approvals', label: 'Approvals' },
@@ -173,8 +173,8 @@ export function MerchantDetailPage() {
           <ProgramsTab merchantId={merchantId} />
         ) : tab === 'rewards' ? (
           <RewardsTab merchantId={merchantId} />
-        ) : tab === 'campaigns' ? (
-          <CampaignsTab merchantId={merchantId} />
+        ) : tab === 'advertising' ? (
+          <AdvertisingTab merchantId={merchantId} />
         ) : tab === 'transactions' ? (
           <TransactionsTab merchantId={merchantId} />
         ) : tab === 'ledger' ? (
@@ -338,7 +338,7 @@ function OverviewTab({ merchantId, merchant }: { merchantId: string; merchant: M
             <MetricCard label="Staff" value={formatNumber(overviewQuery.data.staffCount)} icon={<Users className="size-4" aria-hidden />} />
             <MetricCard label="Customers" value={formatNumber(overviewQuery.data.customerCount)} icon={<UsersRound className="size-4" aria-hidden />} />
             <MetricCard label="Programs" value={formatNumber(overviewQuery.data.activeProgramCount)} icon={<Tag className="size-4" aria-hidden />} hint="active" />
-            <MetricCard label="Campaigns" value={formatNumber(overviewQuery.data.activeCampaignCount)} icon={<Tag className="size-4" aria-hidden />} hint="active" />
+            <MetricCard label="Advertising" value={formatNumber(overviewQuery.data.activeCampaignCount)} icon={<Tag className="size-4" aria-hidden />} hint="active" />
             <MetricCard label="Transactions" value={formatNumber(overviewQuery.data.transactionCount)} icon={<Receipt className="size-4" aria-hidden />} />
           </>
         )}
@@ -421,7 +421,7 @@ const PURGE_KEPT = ['Nothing — every record is removed']
 const PURGE_DESTROYED = [
   'All ledgers, points history, and transactions',
   'Every store, staff member, and customer',
-  'All programs, campaigns, and settings',
+  'All programs, advertising, and settings',
   'All identity and billing records',
 ]
 

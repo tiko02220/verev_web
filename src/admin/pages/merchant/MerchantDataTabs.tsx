@@ -25,12 +25,12 @@ import { can } from '../../auth/permissions'
 import {
   ledgerPageSize,
   useCreateProgram,
-  useDeleteCampaign,
+  useDeleteAdvertising,
   useDeleteProgram,
   useDeleteReward,
+  useMerchantAdvertising,
   useMerchantApprovals,
   useMerchantBilling,
-  useMerchantCampaigns,
   useMerchantLedger,
   useLoyaltySettings,
   useMerchantPrograms,
@@ -38,7 +38,7 @@ import {
   useMerchantTransactionDetail,
   useMerchantTransactions,
   useRenameProgram,
-  useSetCampaignActive,
+  useSetAdvertisingActive,
   useSetLoyaltySettingsEnabled,
   useSetProgramActive,
   useSetRewardActive,
@@ -54,8 +54,8 @@ import type { SimpleColumn } from '../../components/ui/SimpleTable'
 import { DetailDrawer, DetailRow, DetailSection } from '../../components/ui/DetailDrawer'
 import { PROGRAM_SCOPES, PROGRAM_TYPES } from '../../types/api'
 import type {
+  AdminAdvertising,
   AdminApproval,
-  AdminCampaign,
   AdminLedgerEntry,
   AdminProgram,
   AdminRewardSummary,
@@ -64,7 +64,7 @@ import type {
   CreateProgramRequest,
 } from '../../types/api'
 import {
-  GiveawayFormDialog,
+  AdvertisingFormDialog,
   LoyaltyPointsDialog,
   ProgramConfigDialog,
   ProgramTypeFields,
@@ -100,23 +100,6 @@ function rewardStatusTone(status: string): PillTone {
     case 'DISABLED':
       return 'neutral'
     case 'EXPIRED':
-      return 'danger'
-    default:
-      return 'neutral'
-  }
-}
-
-function giveawayStatusTone(status: string): PillTone {
-  switch (status) {
-    case 'READY':
-    case 'SENT':
-      return 'success'
-    case 'SCHEDULED':
-      return 'info'
-    case 'COMPLETED':
-      return 'neutral'
-    case 'EXPIRED':
-    case 'DISABLED':
       return 'danger'
     default:
       return 'neutral'
@@ -162,8 +145,6 @@ function approvalTone(status: string): PillTone {
       return 'neutral'
   }
 }
-
-const GIVEAWAY_LIFECYCLE_LOCKED = new Set(['SENT', 'COMPLETED', 'EXPIRED'])
 
 function CopyId({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
@@ -818,38 +799,38 @@ export function RewardsTab({ merchantId }: { merchantId: string }) {
   )
 }
 
-export function CampaignsTab({ merchantId }: { merchantId: string }) {
+export function AdvertisingTab({ merchantId }: { merchantId: string }) {
   const { admin } = useAdminAuth()
   const canManage = admin ? can(admin.role, 'merchants.config') : false
-  const { data, isLoading, isError, error, refetch } = useMerchantCampaigns(merchantId)
-  const setActive = useSetCampaignActive(merchantId)
-  const deleteCampaign = useDeleteCampaign(merchantId)
-  const [editing, setEditing] = useState<AdminCampaign | null>(null)
-  const [deleting, setDeleting] = useState<AdminCampaign | null>(null)
+  const { data, isLoading, isError, error, refetch } = useMerchantAdvertising(merchantId)
+  const setActive = useSetAdvertisingActive(merchantId)
+  const deleteAdvertising = useDeleteAdvertising(merchantId)
+  const [editing, setEditing] = useState<AdminAdvertising | null>(null)
+  const [deleting, setDeleting] = useState<AdminAdvertising | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<AdminCampaign | null>(null)
+  const [viewing, setViewing] = useState<AdminAdvertising | null>(null)
   const [creating, setCreating] = useState(false)
   const rows = data ?? []
-  const columns: SimpleColumn<AdminCampaign>[] = [
-    { header: 'Name', render: (campaign) => <span className="font-medium text-slate-900">{campaign.name}</span> },
-    { header: 'Reward', render: (campaign) => <span className="text-slate-600">{humanize(campaign.giveawayType || campaign.promotionType)}</span> },
-    { header: 'Value', align: 'right', render: (campaign) => <span className="mono text-slate-700">{formatNumber(campaign.promotionValue)}</span> },
-    { header: 'Window', render: (campaign) => <span className="text-slate-500">{`${formatDate(campaign.startDate)} → ${formatDate(campaign.endDate)}`}</span> },
+  const columns: SimpleColumn<AdminAdvertising>[] = [
+    { header: 'Name', render: (advertising) => <span className="font-medium text-slate-900">{advertising.name}</span> },
+    { header: 'Reward', render: (advertising) => <span className="text-slate-600">{humanize(advertising.promotionType)}</span> },
+    { header: 'Value', align: 'right', render: (advertising) => <span className="mono text-slate-700">{formatNumber(advertising.promotionValue)}</span> },
+    { header: 'Window', render: (advertising) => <span className="text-slate-500">{`${formatDate(advertising.startDate)} → ${formatDate(advertising.endDate)}`}</span> },
     {
       header: 'Status',
-      render: (campaign) => <StatusPill tone={giveawayStatusTone(campaign.giveawayStatus)}>{humanize(campaign.giveawayStatus)}</StatusPill>,
+      render: (advertising) => <StatusPill tone={moderationTone(advertising.moderationStatus)}>{humanize(advertising.moderationStatus)}</StatusPill>,
     },
-    chevronColumn<AdminCampaign>(),
+    chevronColumn<AdminAdvertising>(),
   ]
   return (
     <div className="space-y-4">
       <DataTabHeader
-        title="Giveaways"
+        title="Advertising"
         count={rows.length}
         action={
           canManage ? (
             <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)} className="h-9 px-3">
-              Add giveaway
+              Add advertising
             </Button>
           ) : undefined
         }
@@ -860,20 +841,20 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
         error={error}
         isEmpty={rows.length === 0}
         emptyIcon={<Megaphone className="size-7" aria-hidden />}
-        emptyTitle="No giveaways"
+        emptyTitle="No advertising"
         onRetry={() => refetch()}
       >
-        <SimpleTable<AdminCampaign> rows={rows} getKey={(campaign) => campaign.id} columns={columns} onRowClick={setViewing} />
+        <SimpleTable<AdminAdvertising> rows={rows} getKey={(advertising) => advertising.id} columns={columns} onRowClick={setViewing} />
       </TabGate>
       <DetailDrawer
         open={viewing !== null}
         onClose={() => setViewing(null)}
         title={viewing?.name ?? ''}
-        subtitle={viewing ? humanize(viewing.giveawayType || viewing.promotionType) : undefined}
+        subtitle={viewing ? humanize(viewing.promotionType) : undefined}
         status={
           viewing ? (
             <>
-              <StatusPill tone={giveawayStatusTone(viewing.giveawayStatus)}>{humanize(viewing.giveawayStatus)}</StatusPill>
+              <StatusPill tone={viewing.active ? 'success' : 'neutral'}>{viewing.active ? 'Enabled' : 'Disabled'}</StatusPill>
               <StatusPill tone={moderationTone(viewing.moderationStatus)}>{humanize(viewing.moderationStatus)}</StatusPill>
             </>
           ) : undefined
@@ -893,17 +874,15 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
               >
                 Delete
               </Button>
-              {GIVEAWAY_LIFECYCLE_LOCKED.has(viewing.giveawayStatus) ? null : (
-                <Button
-                  variant="secondary"
-                  icon={<Power className="size-4" aria-hidden />}
-                  className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
-                  isLoading={setActive.isPending}
-                  onClick={() => setActive.mutate({ campaignId: viewing.id, active: !viewing.active })}
-                >
-                  {viewing.active ? 'Disable' : 'Enable'}
-                </Button>
-              )}
+              <Button
+                variant="secondary"
+                icon={<Power className="size-4" aria-hidden />}
+                className={viewing.active ? 'text-red-600' : 'text-brand-dark'}
+                isLoading={setActive.isPending}
+                onClick={() => setActive.mutate({ advertisingId: viewing.id, active: !viewing.active })}
+              >
+                {viewing.active ? 'Disable' : 'Enable'}
+              </Button>
               <Button
                 icon={<Pencil className="size-4" aria-hidden />}
                 onClick={() => {
@@ -918,42 +897,40 @@ export function CampaignsTab({ merchantId }: { merchantId: string }) {
         }
       >
         {viewing ? (
-          <DetailSection title="Giveaway">
+          <DetailSection title="Advertising">
             <DetailRow label="Name" value={viewing.name} />
-            <DetailRow label="Giveaway type" value={humanize(viewing.giveawayType || '—')} />
             <DetailRow label="Promotion type" value={humanize(viewing.promotionType)} />
             <DetailRow label="Value" value={<span className="mono">{formatNumber(viewing.promotionValue)}</span>} />
-            <DetailRow label="Lifecycle" value={humanize(viewing.giveawayStatus)} />
             <DetailRow label="Moderation" value={humanize(viewing.moderationStatus)} />
             <DetailRow label="Enabled" value={viewing.active ? 'Yes' : 'No'} />
             <DetailRow label="Starts" value={formatDate(viewing.startDate)} />
             <DetailRow label="Ends" value={formatDate(viewing.endDate)} />
-            <DetailRow label="Giveaway ID" value={<CopyId value={viewing.id} />} />
+            <DetailRow label="Advertising ID" value={<CopyId value={viewing.id} />} />
           </DetailSection>
         ) : null}
       </DetailDrawer>
-      <GiveawayFormDialog merchantId={merchantId} open={creating} campaign={null} onClose={() => setCreating(false)} />
-      <GiveawayFormDialog merchantId={merchantId} open={editing !== null} campaign={editing} onClose={() => setEditing(null)} />
+      <AdvertisingFormDialog merchantId={merchantId} open={creating} advertising={null} onClose={() => setCreating(false)} />
+      <AdvertisingFormDialog merchantId={merchantId} open={editing !== null} advertising={editing} onClose={() => setEditing(null)} />
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete giveaway"
+        title="Delete advertising"
         description={
           <div className="flex flex-col gap-2">
             <span>
-              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> giveaway. It stops applying immediately. This action cannot be
+              Deletes the <span className="font-semibold text-slate-900">{deleting?.name}</span> advertising. It stops applying immediately. This action cannot be
               undone.
             </span>
             {deleteError ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</span> : null}
           </div>
         }
-        confirmLabel="Delete giveaway"
+        confirmLabel="Delete advertising"
         tone="danger"
-        isLoading={deleteCampaign.isPending}
+        isLoading={deleteAdvertising.isPending}
         onConfirm={() => {
           if (!deleting) return
           setDeleteError(null)
-          deleteCampaign.mutate(
-            { campaignId: deleting.id },
+          deleteAdvertising.mutate(
+            { advertisingId: deleting.id },
             { onSuccess: () => setDeleting(null), onError: (err) => setDeleteError(errorMessage(err, 'Delete failed')) },
           )
         }}

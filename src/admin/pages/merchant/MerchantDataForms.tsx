@@ -4,14 +4,14 @@ import { ApiError } from '../../lib/apiClient'
 import { humanize } from '../../lib/format'
 import {
   useAdjustRewardInventory,
-  useCampaignDetail,
-  useCreateCampaign,
+  useAdvertisingDetail,
+  useCreateAdvertising,
   useCreateReward,
   useMerchantRewards,
   useMerchantStores,
   useProgramDetail,
   useRewardDetail,
-  useUpdateCampaignFull,
+  useUpdateAdvertisingFull,
   useUpdateLoyaltySettings,
   useUpdateProgramConfig,
   useUpdateReward,
@@ -22,9 +22,9 @@ import { programConfigError } from './programForm'
 import type { ProgramTypeConfig } from './programForm'
 import { PROGRAM_SCOPES, PROGRAM_TYPES, PURCHASE_FREQUENCY_BASES, TIER_THRESHOLD_BASES } from '../../types/api'
 import type {
-  AdminCampaign,
-  AdminCampaignDetail,
-  AdminCampaignFullRequest,
+  AdminAdvertising,
+  AdminAdvertisingDetail,
+  AdminAdvertisingFullRequest,
   AdminCreateRewardRequest,
   AdminLoyaltyPointsSettings,
   AdminProgram,
@@ -40,7 +40,7 @@ const REWARD_TYPES = ['FREE_PRODUCT', 'DISCOUNT_COUPON', 'GIFT_ITEM', 'SPECIAL_P
 const REWARD_CATALOG_TYPES = ['REWARD', 'COUPON'] as const
 const REWARD_SCOPES = ['GLOBAL', 'BRANCH'] as const
 const COUPON_BENEFIT_TYPES = ['DISCOUNT_PERCENT', 'BONUS_POINTS', 'REWARD'] as const
-const GIVEAWAY_TYPES = ['BONUS_POINTS', 'DISCOUNT_PERCENT', 'REWARD', 'COUPON'] as const
+const PROMOTION_TYPES = ['BONUS_POINTS', 'PERCENT_DISCOUNT', 'FREE_ITEM'] as const
 const SEND_MODES = ['IMMEDIATE', 'SCHEDULED'] as const
 const AUDIENCE_GENDERS = ['ALL', 'MALE', 'FEMALE'] as const
 
@@ -517,13 +517,11 @@ export function RewardInventoryDialog({
   )
 }
 
-interface GiveawayForm {
+interface AdvertisingForm {
   name: string
   description: string
-  giveawayType: string
-  bonusPointsAmount: number
-  discountPercent: number
-  rewardId: string
+  promotionType: string
+  promotionValue: number
   sendMode: string
   scheduledDate: string
   expirationEnabled: boolean
@@ -536,13 +534,11 @@ interface GiveawayForm {
   active: boolean
 }
 
-const EMPTY_GIVEAWAY: GiveawayForm = {
+const EMPTY_ADVERTISING: AdvertisingForm = {
   name: '',
   description: '',
-  giveawayType: 'BONUS_POINTS',
-  bonusPointsAmount: 0,
-  discountPercent: 0,
-  rewardId: '',
+  promotionType: 'BONUS_POINTS',
+  promotionValue: 0,
   sendMode: 'IMMEDIATE',
   scheduledDate: todayIso(),
   expirationEnabled: false,
@@ -555,59 +551,42 @@ const EMPTY_GIVEAWAY: GiveawayForm = {
   active: true,
 }
 
-function campaignDetailToGiveawayForm(campaign: AdminCampaignDetail): GiveawayForm {
-  const scheduled = campaign.scheduledDate
-    ? campaign.scheduledDate.slice(0, 10)
-    : campaign.startDate
-      ? campaign.startDate.slice(0, 10)
+function advertisingDetailToForm(advertising: AdminAdvertisingDetail): AdvertisingForm {
+  const scheduled = advertising.scheduledDate
+    ? advertising.scheduledDate.slice(0, 10)
+    : advertising.startDate
+      ? advertising.startDate.slice(0, 10)
       : todayIso()
   return {
-    name: campaign.name,
-    description: campaign.description,
-    giveawayType: campaign.giveawayType || 'BONUS_POINTS',
-    bonusPointsAmount: campaign.bonusPointsAmount ?? 0,
-    discountPercent: campaign.discountPercent ?? 0,
-    rewardId: campaign.rewardId ?? '',
-    sendMode: campaign.sendMode || 'IMMEDIATE',
+    name: advertising.name,
+    description: advertising.description,
+    promotionType: advertising.promotionType || 'BONUS_POINTS',
+    promotionValue: advertising.promotionValue,
+    sendMode: advertising.sendMode || 'IMMEDIATE',
     scheduledDate: scheduled,
-    expirationEnabled: campaign.expirationEnabled,
-    expirationDate: campaign.expirationDate ? campaign.expirationDate.slice(0, 10) : todayIso(),
-    audienceAll: campaign.audienceAll,
-    audienceGender: campaign.audienceGender || 'ALL',
-    audienceAgeMin: campaign.audienceAgeMin ?? 0,
-    audienceAgeMax: campaign.audienceAgeMax ?? 0,
-    audienceTierName: campaign.audienceTierName,
-    active: campaign.active,
+    expirationEnabled: advertising.expirationEnabled,
+    expirationDate: advertising.expirationDate ? advertising.expirationDate.slice(0, 10) : todayIso(),
+    audienceAll: advertising.audienceAll,
+    audienceGender: advertising.audienceGender || 'ALL',
+    audienceAgeMin: advertising.audienceAgeMin ?? 0,
+    audienceAgeMax: advertising.audienceAgeMax ?? 0,
+    audienceTierName: advertising.audienceTierName,
+    active: advertising.active,
   }
 }
 
-function promotionTypeFor(giveawayType: string): string {
-  if (giveawayType === 'BONUS_POINTS') return 'BONUS_POINTS'
-  if (giveawayType === 'DISCOUNT_PERCENT') return 'PERCENT_DISCOUNT'
-  return 'FREE_ITEM'
-}
-
-function promotionValueFor(form: GiveawayForm): number {
-  if (form.giveawayType === 'BONUS_POINTS') return form.bonusPointsAmount
-  if (form.giveawayType === 'DISCOUNT_PERCENT') return form.discountPercent
-  return 1
-}
-
-function giveawayFormError(form: GiveawayForm): string | null {
+function advertisingFormError(form: AdvertisingForm): string | null {
   if (form.name.trim().length === 0) return 'Name is required.'
   if (form.description.trim().length === 0) return 'Description is required.'
-  if (form.giveawayType === 'BONUS_POINTS' && form.bonusPointsAmount <= 0) return 'Enter the bonus points amount.'
-  if (form.giveawayType === 'DISCOUNT_PERCENT' && form.discountPercent <= 0) return 'Enter a discount percentage.'
-  if ((form.giveawayType === 'REWARD' || form.giveawayType === 'COUPON') && form.rewardId.length === 0) return 'Select a reward to give away.'
+  if (form.promotionType !== 'FREE_ITEM' && form.promotionValue <= 0) return 'Enter the promotion value.'
   if (form.sendMode === 'SCHEDULED' && form.scheduledDate.trim().length === 0) return 'Choose a scheduled date.'
   if (form.expirationEnabled && form.expirationDate.trim().length === 0) return 'Choose an expiration date.'
   return null
 }
 
-function buildGiveawayRequest(form: GiveawayForm, expectedVersion: number): AdminCampaignFullRequest {
+function buildAdvertisingRequest(form: AdvertisingForm, expectedVersion: number): AdminAdvertisingFullRequest {
   const startDate = form.sendMode === 'IMMEDIATE' ? todayIso() : form.scheduledDate
   const endDate = form.expirationEnabled ? form.expirationDate : farFutureIso(startDate)
-  const usesReward = form.giveawayType === 'REWARD' || form.giveawayType === 'COUPON'
   return {
     scope: 'GLOBAL',
     storeId: null,
@@ -617,8 +596,8 @@ function buildGiveawayRequest(form: GiveawayForm, expectedVersion: number): Admi
     imageUri: null,
     startDate,
     endDate,
-    promotionType: promotionTypeFor(form.giveawayType),
-    promotionValue: promotionValueFor(form),
+    promotionType: form.promotionType,
+    promotionValue: form.promotionType === 'FREE_ITEM' ? 1 : form.promotionValue,
     minimumPurchaseAmount: 0,
     usageLimit: 0,
     promoCode: null,
@@ -633,10 +612,6 @@ function buildGiveawayRequest(form: GiveawayForm, expectedVersion: number): Admi
     scheduledDate: form.sendMode === 'SCHEDULED' ? form.scheduledDate : null,
     expirationEnabled: form.expirationEnabled,
     expirationDate: form.expirationEnabled ? form.expirationDate : null,
-    giveawayType: form.giveawayType,
-    bonusPointsAmount: form.giveawayType === 'BONUS_POINTS' ? form.bonusPointsAmount : null,
-    discountPercent: form.giveawayType === 'DISCOUNT_PERCENT' ? form.discountPercent : null,
-    rewardId: usesReward ? form.rewardId || null : null,
     audienceAll: form.audienceAll,
     audienceGender: form.audienceGender,
     audienceAgeMin: form.audienceAll ? null : form.audienceAgeMin || null,
@@ -645,44 +620,44 @@ function buildGiveawayRequest(form: GiveawayForm, expectedVersion: number): Admi
   }
 }
 
-export function GiveawayFormDialog({
+export function AdvertisingFormDialog({
   merchantId,
   open,
-  campaign,
+  advertising,
   onClose,
 }: {
   merchantId: string
   open: boolean
-  campaign: AdminCampaign | null
+  advertising: AdminAdvertising | null
   onClose: () => void
 }) {
-  const isCreate = campaign === null
-  const createMutation = useCreateCampaign(merchantId)
-  const updateMutation = useUpdateCampaignFull(merchantId)
-  const detailQuery = useCampaignDetail(merchantId, open && campaign ? campaign.id : null)
+  const isCreate = advertising === null
+  const createMutation = useCreateAdvertising(merchantId)
+  const updateMutation = useUpdateAdvertisingFull(merchantId)
+  const detailQuery = useAdvertisingDetail(merchantId, open && advertising ? advertising.id : null)
   const detail = detailQuery.data
-  const [form, setForm] = useState<GiveawayForm>(EMPTY_GIVEAWAY)
+  const [form, setForm] = useState<AdvertisingForm>(EMPTY_ADVERTISING)
   const [errorText, setErrorText] = useState<string | null>(null)
   const [seed, setSeed] = useState<string | null>(null)
 
   if (open && isCreate && seed !== 'create') {
     setSeed('create')
-    setForm(EMPTY_GIVEAWAY)
+    setForm(EMPTY_ADVERTISING)
     setErrorText(null)
   }
   if (open && detail && seed !== detail.id) {
     setSeed(detail.id)
-    setForm(campaignDetailToGiveawayForm(detail))
+    setForm(advertisingDetailToForm(detail))
     setErrorText(null)
   }
   if (!open && seed !== null) setSeed(null)
 
-  function set<K extends keyof GiveawayForm>(field: K, value: GiveawayForm[K]) {
+  function set<K extends keyof AdvertisingForm>(field: K, value: AdvertisingForm[K]) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
   const loadingDetail = !isCreate && detailQuery.isLoading
-  const validation = giveawayFormError(form)
+  const validation = advertisingFormError(form)
   const pending = createMutation.isPending || updateMutation.isPending
 
   function save() {
@@ -691,10 +666,10 @@ export function GiveawayFormDialog({
       return
     }
     setErrorText(null)
-    const request = buildGiveawayRequest(form, detail?.version ?? 0)
-    if (campaign) {
+    const request = buildAdvertisingRequest(form, detail?.version ?? 0)
+    if (advertising) {
       updateMutation.mutate(
-        { campaignId: campaign.id, request },
+        { advertisingId: advertising.id, request },
         { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Update failed')) },
       )
       return
@@ -702,40 +677,34 @@ export function GiveawayFormDialog({
     createMutation.mutate(request, { onSuccess: onClose, onError: (error) => setErrorText(errorMessage(error, 'Create failed')) })
   }
 
-  const usesReward = form.giveawayType === 'REWARD' || form.giveawayType === 'COUPON'
-
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={isCreate ? 'Add giveaway' : 'Edit giveaway'}
+      title={isCreate ? 'Add advertising' : 'Edit advertising'}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
           <Button isLoading={pending} disabled={validation !== null || loadingDetail} onClick={save}>
-            {isCreate ? 'Create giveaway' : 'Save changes'}
+            {isCreate ? 'Create advertising' : 'Save changes'}
           </Button>
         </>
       }
     >
       {loadingDetail ? (
         <div className="py-10">
-          <Spinner label="Loading giveaway…" />
+          <Spinner label="Loading advertising…" />
         </div>
       ) : (
       <div className="flex flex-col gap-3">
         <TextField label="Name" value={form.name} onChange={(event) => set('name', event.target.value)} />
         <TextField label="Description" value={form.description} onChange={(event) => set('description', event.target.value)} />
-        <SelectField label="Giveaway type" value={form.giveawayType} options={GIVEAWAY_TYPES} onChange={(value) => set('giveawayType', value)} />
-        {form.giveawayType === 'BONUS_POINTS' ? (
-          <NumberField label="Bonus points" value={form.bonusPointsAmount} min={0} onChange={(value) => set('bonusPointsAmount', value)} />
+        <SelectField label="Promotion type" value={form.promotionType} options={PROMOTION_TYPES} onChange={(value) => set('promotionType', value)} />
+        {form.promotionType !== 'FREE_ITEM' ? (
+          <NumberField label={form.promotionType === 'PERCENT_DISCOUNT' ? 'Discount percent' : 'Bonus points'} value={form.promotionValue} min={0} onChange={(value) => set('promotionValue', value)} />
         ) : null}
-        {form.giveawayType === 'DISCOUNT_PERCENT' ? (
-          <NumberField label="Discount percent" value={form.discountPercent} min={0} onChange={(value) => set('discountPercent', value)} />
-        ) : null}
-        {usesReward ? <RewardSelectField merchantId={merchantId} value={form.rewardId} onChange={(value) => set('rewardId', value)} /> : null}
 
         <SelectField label="Send mode" value={form.sendMode} options={SEND_MODES} onChange={(value) => set('sendMode', value)} />
         {form.sendMode === 'SCHEDULED' ? (

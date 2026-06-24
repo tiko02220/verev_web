@@ -2,26 +2,26 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Check, CreditCard, ImageOff, Megaphone, X } from 'lucide-react'
 import {
+  useDecideAdvertising,
   useDecideCardDesign,
-  useDecidePromotion,
+  usePendingAdvertising,
   usePendingCardDesigns,
-  usePendingPromotions,
 } from '../api/platform'
 import { formatDate, formatNumber, humanize } from '../lib/format'
 import { Button, Card, ErrorState, PageHeader, Skeleton, StateBlock } from '../components/ui/primitives'
 import { ConfirmDialog } from '../components/ui/Dialog'
 import { ApiError } from '../lib/apiClient'
-import type { ModerationCardDesign, ModerationPromotion } from '../types/api'
+import type { ModerationAdvertising, ModerationCardDesign } from '../types/api'
 
 const TABS = [
-  { key: 'promotions', label: 'Promotions' },
+  { key: 'advertising', label: 'Advertising' },
   { key: 'card-designs', label: 'Card designs' },
 ] as const
 
 export function ModerationPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get('tab') ?? 'promotions'
-  const promotions = usePendingPromotions()
+  const tab = searchParams.get('tab') ?? 'advertising'
+  const advertising = usePendingAdvertising()
   const cardDesigns = usePendingCardDesigns()
 
   function count(n: number | undefined) {
@@ -30,7 +30,7 @@ export function ModerationPage() {
 
   return (
     <>
-      <PageHeader title="Moderation" subtitle="Review and approve merchant-submitted promotions and card designs" />
+      <PageHeader title="Moderation" subtitle="Review and approve merchant-submitted advertising and card designs" />
       <div className="admin-rise p-6 sm:p-8">
         <nav className="mb-6 flex gap-1 border-b border-slate-200" aria-label="Moderation queues">
           {TABS.map((item) => (
@@ -43,12 +43,12 @@ export function ModerationPage() {
               }`}
             >
               {item.label}
-              {count(item.key === 'promotions' ? promotions.data?.length : cardDesigns.data?.length)}
+              {count(item.key === 'advertising' ? advertising.data?.length : cardDesigns.data?.length)}
             </button>
           ))}
         </nav>
 
-        {tab === 'card-designs' ? <CardDesignsQueue query={cardDesigns} /> : <PromotionsQueue query={promotions} />}
+        {tab === 'card-designs' ? <CardDesignsQueue query={cardDesigns} /> : <AdvertisingQueue query={advertising} />}
       </div>
     </>
   )
@@ -58,67 +58,67 @@ interface QueueProps<T> {
   query: { data: T[] | undefined; isLoading: boolean; isError: boolean; error: unknown; refetch: () => void }
 }
 
-function PromotionsQueue({ query }: QueueProps<ModerationPromotion>) {
-  const decide = useDecidePromotion()
-  const [rejecting, setRejecting] = useState<ModerationPromotion | null>(null)
+function AdvertisingQueue({ query }: QueueProps<ModerationAdvertising>) {
+  const decide = useDecideAdvertising()
+  const [rejecting, setRejecting] = useState<ModerationAdvertising | null>(null)
   const [errorText, setErrorText] = useState<string | null>(null)
 
   if (query.isLoading) return <Skeleton className="h-64 w-full" />
   if (query.isError) return <ErrorState message={query.error instanceof Error ? query.error.message : 'Failed to load'} onRetry={query.refetch} />
   const rows = query.data ?? []
-  if (rows.length === 0) return <StateBlock icon={<Megaphone className="size-6" aria-hidden />} title="No promotions awaiting review" subtitle="New merchant promotions appear here for approval." />
+  if (rows.length === 0) return <StateBlock icon={<Megaphone className="size-6" aria-hidden />} title="No advertising awaiting review" subtitle="New merchant advertising appears here for approval." />
 
   return (
     <div className="space-y-4">
-      {rows.map((promotion) => (
-        <Card key={promotion.campaignId} className="overflow-hidden">
+      {rows.map((advertising) => (
+        <Card key={advertising.advertisingId} className="overflow-hidden">
           <div className="flex flex-col gap-4 p-5 sm:flex-row">
-            <Thumbnail src={promotion.imageUri} className="h-32 w-full shrink-0 sm:w-48" />
+            <Thumbnail src={advertising.imageUri} className="h-32 w-full shrink-0 sm:w-48" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-medium text-subtle">
-                    {promotion.merchantName}
-                    {promotion.storeName ? ` · ${promotion.storeName}` : ''}
+                    {advertising.merchantName}
+                    {advertising.storeName ? ` · ${advertising.storeName}` : ''}
                   </p>
-                  <h3 className="text-base font-semibold text-ink">{promotion.name}</h3>
+                  <h3 className="text-base font-semibold text-ink">{advertising.name}</h3>
                 </div>
-                <span className="text-xs text-slate-400">Submitted {formatDate(promotion.createdAt)}</span>
+                <span className="text-xs text-slate-400">Submitted {formatDate(advertising.createdAt)}</span>
               </div>
-              <p className="mt-1 text-sm text-slate-600">{promotion.description || '—'}</p>
+              <p className="mt-1 text-sm text-slate-600">{advertising.description || '—'}</p>
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                <Field label="Type" value={humanize(promotion.promotionType)} />
-                <Field label="Value" value={formatNumber(promotion.promotionValue)} />
-                <Field label="Window" value={`${formatDate(promotion.startDate)} → ${formatDate(promotion.endDate)}`} />
-                <Field label="Min purchase" value={formatNumber(promotion.minimumPurchaseAmount)} />
-                <Field label="Usage limit" value={promotion.usageLimit > 0 ? formatNumber(promotion.usageLimit) : 'Unlimited'} />
-                <Field label="Visibility" value={humanize(promotion.visibility)} />
-                <Field label="Audience" value={audienceLabel(promotion)} />
+                <Field label="Type" value={humanize(advertising.offerType)} />
+                <Field label="Value" value={formatNumber(advertising.offerValue)} />
+                <Field label="Window" value={`${formatDate(advertising.startDate)} → ${formatDate(advertising.endDate)}`} />
+                <Field label="Min purchase" value={formatNumber(advertising.minimumPurchaseAmount)} />
+                <Field label="Usage limit" value={advertising.usageLimit > 0 ? formatNumber(advertising.usageLimit) : 'Unlimited'} />
+                <Field label="Visibility" value={humanize(advertising.visibility)} />
+                <Field label="Audience" value={audienceLabel(advertising)} />
               </dl>
             </div>
           </div>
           <Actions
-            isPending={decide.isPending && decide.variables?.campaignId === promotion.campaignId}
+            isPending={decide.isPending && decide.variables?.advertisingId === advertising.advertisingId}
             onApprove={() => {
               setErrorText(null)
-              decide.mutate({ campaignId: promotion.campaignId, approve: true }, { onError: (e) => setErrorText(e instanceof ApiError ? e.message : 'Failed') })
+              decide.mutate({ advertisingId: advertising.advertisingId, approve: true }, { onError: (e) => setErrorText(e instanceof ApiError ? e.message : 'Failed') })
             }}
-            onReject={() => setRejecting(promotion)}
+            onReject={() => setRejecting(advertising)}
           />
         </Card>
       ))}
       {errorText ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errorText}</p> : null}
       <ConfirmDialog
         open={rejecting !== null}
-        title="Reject promotion"
-        description="This promotion will not go live. Optionally tell the merchant why."
+        title="Reject advertising"
+        description="This advertising will not go live. Optionally tell the merchant why."
         confirmLabel="Reject"
         tone="danger"
         withReason
         isLoading={decide.isPending}
         onConfirm={(reason) => {
           if (!rejecting) return
-          decide.mutate({ campaignId: rejecting.campaignId, approve: false, reason: reason || undefined }, { onSuccess: () => setRejecting(null) })
+          decide.mutate({ advertisingId: rejecting.advertisingId, approve: false, reason: reason || undefined }, { onSuccess: () => setRejecting(null) })
         }}
         onClose={() => setRejecting(null)}
       />
@@ -239,13 +239,13 @@ function Actions({ isPending, onApprove, onReject }: { isPending: boolean; onApp
   )
 }
 
-function audienceLabel(promotion: ModerationPromotion): string {
-  if (promotion.audienceAll) return 'All customers'
+function audienceLabel(advertising: ModerationAdvertising): string {
+  if (advertising.audienceAll) return 'All customers'
   const parts: string[] = []
-  if (promotion.audienceGender && promotion.audienceGender !== 'ALL') parts.push(humanize(promotion.audienceGender))
-  if (promotion.audienceAgeMin !== null || promotion.audienceAgeMax !== null) {
-    parts.push(`age ${promotion.audienceAgeMin ?? 0}–${promotion.audienceAgeMax ?? '∞'}`)
+  if (advertising.audienceGender && advertising.audienceGender !== 'ALL') parts.push(humanize(advertising.audienceGender))
+  if (advertising.audienceAgeMin !== null || advertising.audienceAgeMax !== null) {
+    parts.push(`age ${advertising.audienceAgeMin ?? 0}–${advertising.audienceAgeMax ?? '∞'}`)
   }
-  if (promotion.audienceTierName) parts.push(promotion.audienceTierName)
+  if (advertising.audienceTierName) parts.push(advertising.audienceTierName)
   return parts.length > 0 ? parts.join(', ') : 'Targeted'
 }

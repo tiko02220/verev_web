@@ -240,19 +240,18 @@ export interface AdminRewardInventoryAdjustmentRequest {
   delta: number
 }
 
-export interface AdminCampaignResponseModel {
+export interface AdminAdvertisingResponseModel {
   id: string
   name: string
   promotionType: string
   promotionValue: number
   active: boolean
-  giveawayStatus: string
   moderationStatus: string
   startDate: string
   endDate: string
 }
 
-export interface AdminCampaignFullRequest {
+export interface AdminAdvertisingFullRequest {
   scope: string
   storeId: string | null
   expectedVersion: number
@@ -277,10 +276,6 @@ export interface AdminCampaignFullRequest {
   scheduledDate: string | null
   expirationEnabled: boolean
   expirationDate: string | null
-  giveawayType: string | null
-  bonusPointsAmount: number | null
-  discountPercent: number | null
-  rewardId: string | null
   audienceAll: boolean
   audienceGender: string
   audienceAgeMin: number | null
@@ -365,14 +360,12 @@ export interface AdminProgram {
   createdAt: string
 }
 
-export interface AdminCampaign {
+export interface AdminAdvertising {
   id: string
   name: string
   promotionType: string
   promotionValue: number
-  giveawayType: string
   active: boolean
-  giveawayStatus: string
   moderationStatus: string
   startDate: string
   endDate: string
@@ -450,7 +443,7 @@ export interface AdminRewardDetail {
   version: number
 }
 
-export interface AdminCampaignDetail {
+export interface AdminAdvertisingDetail {
   id: string
   storeId: string | null
   scope: string
@@ -475,18 +468,11 @@ export interface AdminCampaignDetail {
   scheduledDate: string | null
   expirationEnabled: boolean
   expirationDate: string | null
-  giveawayType: string
-  bonusPointsAmount: number | null
-  discountPercent: number | null
-  rewardId: string | null
-  rewardName: string
-  rewardCatalogType: string
   audienceAll: boolean
   audienceGender: string
   audienceAgeMin: number | null
   audienceAgeMax: number | null
   audienceTierName: string
-  giveawayStatus: string
   moderationStatus: string
   version: number
 }
@@ -588,16 +574,16 @@ export interface NotificationSettings {
   telegramChatIds: string[]
 }
 
-export interface ModerationPromotion {
-  campaignId: string
+export interface ModerationAdvertising {
+  advertisingId: string
   organizationId: string
   merchantName: string
   storeName: string
   name: string
   description: string
   imageUri: string
-  promotionType: string
-  promotionValue: number
+  offerType: string
+  offerValue: number
   startDate: string
   endDate: string
   minimumPurchaseAmount: number

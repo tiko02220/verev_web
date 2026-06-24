@@ -4,8 +4,8 @@ import type {
   AppUpdateConfig,
   AuditEntry,
   CreateAdminRequest,
+  ModerationAdvertising,
   ModerationCardDesign,
-  ModerationPromotion,
   NotificationSettings,
   PlatformAdminUser,
   PlatformDashboard,
@@ -41,21 +41,21 @@ export function useAuditEntry(id: string | null) {
   })
 }
 
-export function usePendingPromotions() {
+export function usePendingAdvertising() {
   return useQuery({
-    queryKey: ['moderation-promotions'],
-    queryFn: () => api.get<ModerationPromotion[]>('/v1/admin/moderation/promotions'),
+    queryKey: ['moderation-advertising'],
+    queryFn: () => api.get<ModerationAdvertising[]>('/v1/admin/moderation/advertising'),
   })
 }
 
-export function useDecidePromotion() {
+export function useDecideAdvertising() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ campaignId, approve, reason }: { campaignId: string; approve: boolean; reason?: string }) =>
+    mutationFn: ({ advertisingId, approve, reason }: { advertisingId: string; approve: boolean; reason?: string }) =>
       approve
-        ? api.post<Record<string, string>>('/v1/admin/moderation/promotions/approve', {}, { campaignId })
-        : api.post<Record<string, string>>('/v1/admin/moderation/promotions/reject', { reason }, { campaignId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-promotions'] }),
+        ? api.post<Record<string, string>>('/v1/admin/moderation/advertising/approve', {}, { advertisingId })
+        : api.post<Record<string, string>>('/v1/admin/moderation/advertising/reject', { reason }, { advertisingId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['moderation-advertising'] }),
   })
 }
 
