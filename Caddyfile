@@ -34,6 +34,12 @@
 		file_server
 	}
 
+	# Static project map embedded by the admin console (/admin/project-map -> iframe /project-map.html).
+	handle /project-map.html {
+		root * /srv/site
+		file_server
+	}
+
 	# Public wallet + versioned API contract: card links (/wallet/c/*), the Google
 	# callback (/wallet/google/callback) and the whole /v1 API. Proxied explicitly so
 	# a more-specific match always wins — a future static/SPA fallback cannot swallow
