@@ -34,8 +34,12 @@
 		file_server
 	}
 
-	# Static project map embedded by the admin console (/admin/project-map -> iframe /project-map.html).
+	# Project map: admin-only. The admin console fetches it WITH the bearer token; a direct
+	# browser hit has no token, so forward_auth (-> /v1/admin/auth/me) rejects it before serving.
 	handle /project-map.html {
+		forward_auth {$BACKEND_UPSTREAM} {
+			uri /v1/admin/auth/me
+		}
 		root * /srv/site
 		file_server
 	}

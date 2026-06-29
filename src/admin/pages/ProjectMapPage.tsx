@@ -1,6 +1,37 @@
+import { useEffect, useState } from 'react'
 import { ExternalLink, Workflow } from 'lucide-react'
+import { useAdminAuth } from '../auth/AdminAuthContext'
 
 export function ProjectMapPage() {
+  const { token } = useAdminAuth()
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!token) return
+    let objectUrl: string | null = null
+    let cancelled = false
+    setFailed(false)
+    setSrc(null)
+    fetch('/project-map.html', { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => {
+        if (!response.ok) throw new Error(`status ${response.status}`)
+        return response.blob()
+      })
+      .then((blob) => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setSrc(objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [token])
+
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 bg-canvas/85 px-6 py-5 backdrop-blur-md sm:px-8">
@@ -13,21 +44,25 @@ export function ProjectMapPage() {
             <p className="text-sm text-subtle">Architecture, user flows, screen flows, data model, realtime and API across the platform</p>
           </div>
         </div>
-        <a
-          href="/project-map.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        <button
+          type="button"
+          onClick={() => {
+            if (src) window.open(src, '_blank', 'noopener,noreferrer')
+          }}
+          disabled={!src}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ExternalLink className="size-4" aria-hidden />
           Open full screen
-        </a>
+        </button>
       </header>
-      <iframe
-        title="OneBonus project map"
-        src="/project-map.html"
-        className="min-h-0 w-full flex-1 border-0 bg-white"
-      />
+      {failed ? (
+        <div className="flex flex-1 items-center justify-center px-6 text-sm text-subtle">Couldn’t load the project map. Refresh and try again.</div>
+      ) : src ? (
+        <iframe title="OneBonus project map" src={src} className="min-h-0 w-full flex-1 border-0 bg-white" />
+      ) : (
+        <div className="flex flex-1 items-center justify-center px-6 text-sm text-subtle">Loading…</div>
+      )}
     </div>
   )
 }
