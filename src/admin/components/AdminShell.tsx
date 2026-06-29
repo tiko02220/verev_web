@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Bell, ClipboardCheck, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Smartphone, Store, UsersRound, X } from 'lucide-react'
+import { Bell, ClipboardCheck, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Smartphone, Store, UsersRound, Workflow, X } from 'lucide-react'
 import { useAdminAuth } from '../auth/AdminAuthContext'
 import { can } from '../auth/permissions'
 import type { Capability } from '../auth/permissions'
@@ -29,6 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/customers', label: 'Customers', icon: UsersRound },
       { to: '/admin/moderation', label: 'Moderation', icon: ClipboardCheck, capability: 'merchants.config' },
       { to: '/admin/audit', label: 'Audit log', icon: ScrollText },
+      { to: '/admin/project-map', label: 'Project map', icon: Workflow },
     ],
   },
   {

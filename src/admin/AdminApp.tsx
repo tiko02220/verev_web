@@ -16,6 +16,7 @@ import { AppUpdatesPage } from './pages/AppUpdatesPage'
 import { AdminsPage } from './pages/AdminsPage'
 import { ModerationPage } from './pages/ModerationPage'
 import { NotificationsPage } from './pages/NotificationsPage'
+import { ProjectMapPage } from './pages/ProjectMapPage'
 
 export default function AdminApp() {
   return (
@@ -37,6 +38,7 @@ export default function AdminApp() {
               <Route path="customers" element={<CustomersPage />} />
               <Route path="customers/:customerId" element={<CustomerDetailPage />} />
               <Route path="audit" element={<AuditPage />} />
+              <Route path="project-map" element={<ProjectMapPage />} />
               <Route path="moderation" element={<ModerationPage />} />
               <Route path="app-updates" element={<AppUpdatesPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
