@@ -12,7 +12,7 @@ export function ProjectMapPage() {
     if (!token) return
     let objectUrl: string | null = null
     let cancelled = false
-    fetch('/project-map.html', { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/project-map.html', { cache: 'no-store', headers: { Authorization: `Bearer ${token}` } })
       .then((response) => {
         if (!response.ok) throw new Error(`status ${response.status}`)
         return response.blob()
