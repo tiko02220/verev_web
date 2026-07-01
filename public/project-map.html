@@ -125,6 +125,35 @@ td.fn{font-family:ui-monospace,Menlo,monospace;color:var(--tx);white-space:nowra
 .detail .when+.dh,.detail .hdrs+.dh{margin-top:12px}
 .branchwrap{margin-left:7px;padding-left:13px}
 .chips{gap:7px}
+
+.aclist{display:flex;flex-direction:column;gap:11px;padding:2px}
+.ac-hint{font-size:11.5px;color:var(--tx2);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:2px}
+.apicall{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.apicall .ac-crumb{font-size:10.5px;color:var(--tx3);margin-bottom:7px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;line-height:1.5}
+.apicall .ac-crumb span{white-space:nowrap}.ac-sep{color:var(--line2);font-style:normal;font-size:11px}
+.ac-title{font-size:14px;font-weight:620;color:var(--tx);margin-bottom:9px;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.ac-a{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx3);font-weight:400}
+.ac-req{border:1px solid var(--line);border-left:3px solid var(--info);background:var(--bg);border-radius:9px;padding:10px 12px;margin-bottom:8px}
+.ac-line{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.ac-path{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--tx);font-weight:600;word-break:break-all}
+.ac-ent{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--tx2)}
+.verb.local{background:var(--panel2);color:var(--tx3)}
+.ac-when{color:var(--warn);font-size:11px;font-family:ui-monospace,Menlo,monospace;margin-top:7px}
+.apicall .dh{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);margin:10px 0 5px}
+.ac-req .dh{margin:9px 0 5px}.ac-req .hdrs{margin-top:7px}
+.ac-req .hdrs span{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-right:5px;display:inline-block;margin-bottom:4px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx2)}
+.ac-outs-h{margin-top:2px !important}
+.ac-out{border:1px solid var(--line);border-left:3px solid var(--neutral);border-radius:9px;margin-top:6px;overflow:hidden;background:var(--bg)}
+.ac-out.ok{border-left-color:var(--ok)}.ac-out.warn{border-left-color:var(--warn)}.ac-out.err{border-left-color:var(--err)}.ac-out.info{border-left-color:var(--info)}
+.ac-out-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 11px}
+.ac-out-h[onclick]{cursor:pointer}.ac-out-h[onclick]:hover{background:var(--panel2)}
+.ac-out-h .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+.ac-out-h .rcode{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px}
+.ac-out-d{color:var(--tx2);font-size:11.5px}
+.ac-out .chev2{margin-left:auto}
+.ac-out-b{display:none;padding:9px 11px;border-top:1px solid var(--line);background:var(--panel)}
+.ac-out-b.open{display:block}.ac-out-b .dh{margin-top:0}
+.ac-empty{color:var(--tx3);font-size:12px;padding:10px}
 </style></head><body><div class="wrap"><header class="top"><h1>OneBonus</h1><span class="sub">Visual project map - NFC loyalty CRM - flows, screens, data, API</span></header><div class="stats" id="stats"></div><nav class="tabs"><button data-v="flows" class="on">User flows</button><button data-v="wire">Screen flows</button><button data-v="arch">Architecture</button><button data-v="tables">Data model</button><button data-v="events">Realtime</button><button data-v="api">API</button><input id="search" placeholder="Search flows, tables, fields, endpoints..."/></nav><section class="view on" id="v-flows"></section><section class="view" id="v-wire"></section><section class="view" id="v-arch"></section><section class="view" id="v-tables"></section><section class="view" id="v-events"></section><section class="view" id="v-api"></section><div class="foot">User flows = flowcharts with decision diamonds + cases (toggle each to API &amp; JSON). Screen flows = wireframe UI journeys. Data model = all 81 tables / 1095 fields.<br/>Rules: CLAUDE.md + docs/ARCHITECTURE.md. Full text: PROJECT_MAP.md.</div></div><script>(function(JM,_g){typeof exports=="object"&&typeof module<"u"?module.exports=_g():typeof define=="function"&&define.amd?define(_g):(JM=typeof globalThis<"u"?globalThis:JM||self,JM.mermaid=_g())})(this,function(){var jWe,$We;"use strict";function JM(i){for(var s=[],u=1;u<arguments.length;u++)s[u-1]=arguments[u];var d=Array.from(typeof i=="string"?[i]:i);d[d.length-1]=d[d.length-1].replace(/\r?\n([\t ]*)$/,"");var p=d.reduce(function(y,T){var _=T.match(/\n([\t ]+|(?!\s).)/g);return _?y.concat(_.map(function(A){var P,R;return(R=(P=A.match(/[\t ]/g))===null||P===void 0?void 0:P.length)!==null&&R!==void 0?R:0})):y},[]);if(p.length){var v=new RegExp(`
 [	 ]{`+Math.min.apply(Math,p)+"}","g");d=d.map(function(y){return y.replace(v,`
 `)})}d[0]=d[0].replace(/^\r?\n/,"");var b=d[0];return s.forEach(function(y,T){var _=b.match(/(?:^|\n)( *)$/),A=_?_[1]:"",P=y;typeof y=="string"&&y.includes(`
@@ -2233,6 +2262,34 @@ function renderSteps(steps){return steps.map((s,i)=>{const last=i===steps.length
     if(b.desc)x+='<div class="bdesc">'+esc(b.desc)+'</div>';if(b.res)x+='<div class="chips">'+resChip(b.res,b.kind)+'</div>';if(b.steps)x+='<div class="tree">'+renderSteps(b.steps)+'</div>';return x+'</div>';}).join('')+'</div>';}
   return '<div class="tstep '+(last?'last':'')+'"><span class="tdot"></span>'+h+'</div>';}).join('');}
 
+
+function pmCrumb(cr){return cr.length?'<div class="ac-crumb">'+cr.map(function(x){return '<span>'+esc(x)+'</span>';}).join('<i class="ac-sep">›</i>')+'</div>':'';}
+function pmOutcome(b){var id='d'+(UID++);var det=(b.res&&((b.res.fields&&b.res.fields.length)||b.res.json!=null));
+  var h='<div class="ac-out-h"'+(det?' onclick="document.getElementById(\''+id+'\').classList.toggle(\'open\')"':'')+'>'
+    +'<span class="tag '+esc(b.kind||'neutral')+'">'+esc(b.case)+'</span>'
+    +(b.code&&b.code!=='—'?'<span class="rcode code-'+esc(b.kind||'neutral')+'">'+esc(b.code)+'</span>':'')
+    +(b.res&&b.res.ent?'<span class="ac-ent">'+esc(b.res.ent)+'</span>':'')
+    +(b.desc?'<span class="ac-out-d">'+esc(b.desc)+'</span>':'')
+    +(det?'<span class="chev2">▸</span>':'')+'</div>';
+  var body=det?'<div class="ac-out-b" id="'+id+'">'+((b.res.fields&&b.res.fields.length)?fieldRows(b.res.fields):'')+(b.res.json!=null?'<div class="dh">sample</div><div class="jsonbox">'+jhtml(b.res.json)+'</div>':'')+'</div>':'';
+  return '<div class="ac-out '+esc(b.kind||'neutral')+'">'+h+body+'</div>';}
+function pmCard(it){var r=it.req;var rb='';
+  if(r){var isHttp=['GET','POST','PUT','PATCH','DELETE','WS'].indexOf(r.m)>=0;
+    var hd=(r.h&&r.h.length)?'<div class="hdrs">'+r.h.map(function(x){return '<span>'+esc(x)+'</span>';}).join('')+'</div>':'';
+    rb='<div class="ac-req"><div class="ac-line">'+(isHttp?'<span class="verb '+esc(r.m)+'">'+esc(r.m)+'</span>':'<span class="verb local">local</span>')+'<span class="ac-path">'+esc(r.p)+'</span>'+(r.ent?'<span class="ac-ent">'+esc(r.ent)+'</span>':'')+'</div>'
+      +(r.when?'<div class="ac-when">'+esc(r.when)+'</div>':'')+hd
+      +((r.fields&&r.fields.length)?'<div class="dh">request body</div>'+fieldRows(r.fields):'')
+      +(r.json!=null?'<div class="dh">sample request</div><div class="jsonbox">'+jhtml(r.json)+'</div>':'')+'</div>';}
+  var outs='';
+  if(it.outs&&it.outs.length){outs='<div class="dh ac-outs-h">responses</div>'+it.outs.map(pmOutcome).join('');}
+  else if(it.res){outs='<div class="dh ac-outs-h">response</div>'+pmOutcome({case:'returns',kind:'ok',code:it.res.code,res:it.res});}
+  return '<div class="apicall">'+pmCrumb(it.crumb)+'<div class="ac-title">'+esc(it.t)+(it.a?'<span class="ac-a">'+esc(it.a)+'</span>':'')+'</div>'+rb+outs+'</div>';}
+function pmCollect(steps,crumb,acc){(steps||[]).forEach(function(s){
+  if(s.req||s.res)acc.push({crumb:crumb.slice(),t:s.t,a:s.a,req:s.req||null,res:s.res||null,outs:s.out||null});
+  (s.out||[]).forEach(function(b){if(b.steps&&b.steps.length)pmCollect(b.steps,crumb.concat([b.case]),acc);});
+  if(s.steps&&s.steps.length)pmCollect(s.steps,crumb,acc);});}
+function renderApiList(f){var acc=[];pmCollect(f.steps,[],acc);if(!acc.length)return '<div class="ac-empty">No API calls in this flow.</div>';return '<div class="aclist"><div class="ac-hint">Every API call this flow makes, in order. The branching logic is in the Flow diagram.</div>'+acc.map(pmCard).join('')+'</div>';}
+
 /* ---------- FLOWS TAB ---------- */
 document.getElementById('v-flows').innerHTML=
  '<div class="legend"><span><i class="lg-shape lg-circle"></i>start/end</span><span><i class="lg-shape lg-rect"></i>screen / action</span><span><i class="lg-shape lg-diam"></i>decision</span><span><i class="dot" style="background:var(--ok)"></i>success</span><span><i class="dot" style="background:var(--warn)"></i>branch / approval</span><span><i class="dot" style="background:var(--err)"></i>error</span></div>'
@@ -2241,7 +2298,7 @@ document.getElementById('v-flows').innerHTML=
    +'<div class="seg"><button class="on" onclick="this.closest(\'.flow\').classList.remove(\'showcalls\');this.classList.add(\'on\');this.nextElementSibling.classList.remove(\'on\')">Flow diagram</button><button onclick="this.closest(\'.flow\').classList.add(\'showcalls\');this.classList.add(\'on\');this.previousElementSibling.classList.remove(\'on\')">API &amp; JSON</button></div></div>'
    +'<p class="flowdesc">'+esc(f.desc)+'</p>'
    +'<div class="diagram"><pre class="mermaid">'+esc(flowMermaid(f))+'</pre></div>'
-   +'<div class="calls"><div class="tree">'+renderSteps(f.steps)+'</div></div></div>';}).join('');
+   +'<div class="calls">'+renderApiList(f)+'</div></div>';}).join('');
 
 /* ---------- WIREFLOW TAB ---------- */
 const SCR=D.screens, JR=D.journeys;
