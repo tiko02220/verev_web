@@ -2197,6 +2197,8 @@ function flowMermaid(flow){
   let L=['flowchart TD'],id=0;const nid=()=>'n'+(id++);const cls=[];
   const start=nid();L.push(start+'(("Start"))');cls.push([start,'se']);
   const aid=x=>'a_'+san(x).replace(/ /g,'_');
+  const alabel={};(function scan(st){(st||[]).forEach(function(s){if(s.anchor)alabel[s.anchor]=s.t||s.anchor;(s.out||[]).forEach(function(b){scan(b.steps||[]);});scan(s.steps||[]);});})(flow.steps);
+  function gterm(from,tgt,el){var g=nid();L.push(g+'(["\u21aa '+san(alabel[tgt]||tgt)+'"])');cls.push([g,'goto']);L.push(from+' -->'+(el?'|"'+el+'"|':'')+' '+g);}
   function walk(steps,from,fromLabel){
     let prev=from,plab=fromLabel;
     steps.forEach(s=>{
@@ -2215,7 +2217,7 @@ function flowMermaid(flow){
         let cont=null;
         s.out.forEach(b=>{
           const elab=san(b.case)+(b.code?(' '+san(b.code)):'');
-          if(b.goto){L.push(decFrom+' -->|"'+elab+'"| '+aid(b.goto));return;}
+          if(b.goto){gterm(decFrom,b.goto,elab);return;}
           if(b.steps&&b.steps.length&&!b.res){const end=walk(b.steps,decFrom,elab);if(b.kind==='ok'&&!cont)cont=end;}
           else{
             const otxt=san(b.case)+(b.res?('<br>'+san(b.res.code+' '+b.res.ent)):'');const o=nid();
@@ -2227,14 +2229,14 @@ function flowMermaid(flow){
       }else{
         const cur=s.anchor?aid(s.anchor):nid();L.push(cur+'["'+san(s.t)+call+'"]');cls.push([cur,'act']);
         if(prev)L.push(prev+' -->'+(plab?'|"'+plab+'"|':'')+' '+cur);plab=null;
-        if(s.goto){L.push(cur+' --> '+aid(s.goto));prev=null;}else prev=cur;
+        if(s.goto){gterm(cur,s.goto);prev=null;}else prev=cur;
       }
     });
     return prev;
   }
   walk(flow.steps,start);
-  const C=DARK?{se:'fill:#10241c,stroke:#3fb985,color:#9fe1cb',act:'fill:#1b212b,stroke:#4b5563,color:#e6edf3',dec:'fill:#2a230f,stroke:#ef9f27,color:#fac775',ok:'fill:#0f2a20,stroke:#3fb985,color:#9fe1cb',warn:'fill:#2a230f,stroke:#ef9f27,color:#fac775',err:'fill:#2a1414,stroke:#e24b4a,color:#f0c1c1',info:'fill:#0c2236,stroke:#378add,color:#b5d4f4',neutral:'fill:#1b212b,stroke:#888,color:#cbd5e1'}
-   :{se:'fill:#e1f5ee,stroke:#0f6e56,color:#04342c',act:'fill:#ffffff,stroke:#9aa3ad,color:#1a1f24',dec:'fill:#faeeda,stroke:#854f0b,color:#412402',ok:'fill:#e1f5ee,stroke:#0f6e56,color:#04342c',warn:'fill:#faeeda,stroke:#854f0b,color:#412402',err:'fill:#fcebeb,stroke:#a32d2d,color:#501313',info:'fill:#e6f1fb,stroke:#185fa5,color:#042c53',neutral:'fill:#f1f2ee,stroke:#888,color:#2c2c2a'};
+  const C=DARK?{se:'fill:#10241c,stroke:#3fb985,color:#9fe1cb',goto:'fill:#161b22,stroke:#7f77dd,color:#b7b1f0',act:'fill:#1b212b,stroke:#4b5563,color:#e6edf3',dec:'fill:#2a230f,stroke:#ef9f27,color:#fac775',ok:'fill:#0f2a20,stroke:#3fb985,color:#9fe1cb',warn:'fill:#2a230f,stroke:#ef9f27,color:#fac775',err:'fill:#2a1414,stroke:#e24b4a,color:#f0c1c1',info:'fill:#0c2236,stroke:#378add,color:#b5d4f4',neutral:'fill:#1b212b,stroke:#888,color:#cbd5e1'}
+   :{se:'fill:#e1f5ee,stroke:#0f6e56,color:#04342c',goto:'fill:#eef0fb,stroke:#5b52c9,color:#3c3489',act:'fill:#ffffff,stroke:#9aa3ad,color:#1a1f24',dec:'fill:#faeeda,stroke:#854f0b,color:#412402',ok:'fill:#e1f5ee,stroke:#0f6e56,color:#04342c',warn:'fill:#faeeda,stroke:#854f0b,color:#412402',err:'fill:#fcebeb,stroke:#a32d2d,color:#501313',info:'fill:#e6f1fb,stroke:#185fa5,color:#042c53',neutral:'fill:#f1f2ee,stroke:#888,color:#2c2c2a'};
   Object.keys(C).forEach(k=>L.push('classDef '+k+' '+C[k]+',stroke-width:1.5px'));
   const byc={};cls.forEach(([n,k])=>{(byc[k=k||'neutral']=byc[k]||[]).push(n)});
   Object.keys(byc).forEach(k=>L.push('class '+byc[k].join(',')+' '+k));
@@ -2369,6 +2371,6 @@ document.getElementById('search').addEventListener('input',e=>{const q=e.target.
   filt('[data-flow]');filt('[data-tbl]','.dom',true);filt('[data-api]');filt('.kvr');});
 
 /* ---------- RENDER MERMAID ---------- */
-try{mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'base',themeVariables:{fontSize:'13px',lineColor:DARK?'#5a6675':'#b4b2a9',primaryBorderColor:DARK?'#39414e':'#cfd3cb'},flowchart:{htmlLabels:true,curve:'basis',nodeSpacing:26,rankSpacing:42,padding:8,useMaxWidth:true,wrappingWidth:200},fontFamily:'-apple-system,Segoe UI,Roboto,sans-serif'});
+try{mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'base',themeVariables:{fontSize:'13px',lineColor:DARK?'#5a6675':'#b4b2a9',primaryBorderColor:DARK?'#39414e':'#cfd3cb'},flowchart:{htmlLabels:true,curve:'basis',nodeSpacing:34,rankSpacing:64,padding:8,useMaxWidth:true,wrappingWidth:200},fontFamily:'-apple-system,Segoe UI,Roboto,sans-serif'});
   mermaid.run({querySelector:'.mermaid'});}catch(err){document.querySelectorAll('.diagram').forEach(d=>d.innerHTML='<div style="color:var(--tx2);font-size:12px;padding:8px">Diagram engine failed to load. Use the "API &amp; JSON" view.</div>');}
 </script></body></html>
