@@ -126,34 +126,43 @@ td.fn{font-family:ui-monospace,Menlo,monospace;color:var(--tx);white-space:nowra
 .branchwrap{margin-left:7px;padding-left:13px}
 .chips{gap:7px}
 
-.aclist{display:flex;flex-direction:column;gap:11px;padding:2px}
-.ac-hint{font-size:11.5px;color:var(--tx2);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:2px}
-.apicall{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.apicall .ac-crumb{font-size:10.5px;color:var(--tx3);margin-bottom:7px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;line-height:1.5}
-.apicall .ac-crumb span{white-space:nowrap}.ac-sep{color:var(--line2);font-style:normal;font-size:11px}
-.ac-title{font-size:14px;font-weight:620;color:var(--tx);margin-bottom:9px;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
-.ac-a{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx3);font-weight:400}
-.ac-req{border:1px solid var(--line);border-left:3px solid var(--info);background:var(--bg);border-radius:9px;padding:10px 12px;margin-bottom:8px}
-.ac-line{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.ac-path{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--tx);font-weight:600;word-break:break-all}
+.aclist{display:flex;flex-direction:column;gap:8px;padding:2px}
+.ac-hint{font-size:11.5px;color:var(--tx2);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:4px}
+.apicall{background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.apicall.open{border-color:var(--line2)}
+.ac-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;cursor:pointer;flex-wrap:wrap}
+.ac-head:hover{background:var(--panel2)}
+.ac-hmain{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 240px}
+.ac-hmain .ac-path{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-hside{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.ac-tt{font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.ac-badges{display:flex;gap:4px}
+.mini{font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px}
+.apicall .chev2{color:var(--tx3);font-size:11px;transition:transform .15s;margin-left:0}
+.apicall.open .chev2{transform:rotate(90deg);color:var(--accent)}
+.ac-body{display:none;padding:0 13px 13px;border-top:1px solid var(--line)}
+.apicall.open .ac-body{display:block}
+.ac-crumb{font-size:10.5px;color:var(--tx3);margin:9px 0 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;line-height:1.5}
+.ac-crumb span{white-space:nowrap}.ac-sep{color:var(--line2);font-style:normal;font-size:11px}
+.ac-sec{margin-top:11px}
+.ac-sec-t{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);font-weight:700;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.ac-a2{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx3);margin-bottom:6px}
+.ac-line{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+.ac-line .ac-path{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--tx);font-weight:600;word-break:break-all}
 .ac-ent{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--tx2)}
 .verb.local{background:var(--panel2);color:var(--tx3)}
-.ac-when{color:var(--warn);font-size:11px;font-family:ui-monospace,Menlo,monospace;margin-top:7px}
-.apicall .dh{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);margin:10px 0 5px}
-.ac-req .dh{margin:9px 0 5px}.ac-req .hdrs{margin-top:7px}
-.ac-req .hdrs span{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-right:5px;display:inline-block;margin-bottom:4px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx2)}
-.ac-outs-h{margin-top:2px !important}
-.ac-out{border:1px solid var(--line);border-left:3px solid var(--neutral);border-radius:9px;margin-top:6px;overflow:hidden;background:var(--bg)}
-.ac-out.ok{border-left-color:var(--ok)}.ac-out.warn{border-left-color:var(--warn)}.ac-out.err{border-left-color:var(--err)}.ac-out.info{border-left-color:var(--info)}
-.ac-out-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 11px}
-.ac-out-h[onclick]{cursor:pointer}.ac-out-h[onclick]:hover{background:var(--panel2)}
-.ac-out-h .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
-.ac-out-h .rcode{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px}
-.ac-out-d{color:var(--tx2);font-size:11.5px}
-.ac-out .chev2{margin-left:auto}
-.ac-out-b{display:none;padding:9px 11px;border-top:1px solid var(--line);background:var(--panel)}
-.ac-out-b.open{display:block}.ac-out-b .dh{margin-top:0}
+.ac-when{color:var(--warn);font-size:11px;font-family:ui-monospace,Menlo,monospace;margin-top:6px}
+.ac-body .dh{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);margin:9px 0 5px}
+.ac-body .hdrs{margin-top:7px}
+.ac-body .hdrs span{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-right:5px;display:inline-block;margin-bottom:4px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--tx2)}
+.ac-resp{border:1px solid var(--line);border-left:3px solid var(--neutral);border-radius:8px;padding:9px 11px;margin-top:7px;background:var(--bg)}
+.ac-resp.ok{border-left-color:var(--ok)}.ac-resp.warn{border-left-color:var(--warn)}.ac-resp.err{border-left-color:var(--err)}.ac-resp.info{border-left-color:var(--info)}
+.ac-resp-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ac-resp-h .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+.ac-resp-h .rcode{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px}
+.ac-resp-d{color:var(--tx2);font-size:11.5px;margin-top:5px}
 .ac-empty{color:var(--tx3);font-size:12px;padding:10px}
+
 </style></head><body><div class="wrap"><header class="top"><h1>OneBonus</h1><span class="sub">Visual project map - NFC loyalty CRM - flows, screens, data, API</span></header><div class="stats" id="stats"></div><nav class="tabs"><button data-v="flows" class="on">User flows</button><button data-v="wire">Screen flows</button><button data-v="arch">Architecture</button><button data-v="tables">Data model</button><button data-v="events">Realtime</button><button data-v="api">API</button><input id="search" placeholder="Search flows, tables, fields, endpoints..."/></nav><section class="view on" id="v-flows"></section><section class="view" id="v-wire"></section><section class="view" id="v-arch"></section><section class="view" id="v-tables"></section><section class="view" id="v-events"></section><section class="view" id="v-api"></section><div class="foot">User flows = flowcharts with decision diamonds + cases (toggle each to API &amp; JSON). Screen flows = wireframe UI journeys. Data model = all 81 tables / 1095 fields.<br/>Rules: CLAUDE.md + docs/ARCHITECTURE.md. Full text: PROJECT_MAP.md.</div></div><script>(function(JM,_g){typeof exports=="object"&&typeof module<"u"?module.exports=_g():typeof define=="function"&&define.amd?define(_g):(JM=typeof globalThis<"u"?globalThis:JM||self,JM.mermaid=_g())})(this,function(){var jWe,$We;"use strict";function JM(i){for(var s=[],u=1;u<arguments.length;u++)s[u-1]=arguments[u];var d=Array.from(typeof i=="string"?[i]:i);d[d.length-1]=d[d.length-1].replace(/\r?\n([\t ]*)$/,"");var p=d.reduce(function(y,T){var _=T.match(/\n([\t ]+|(?!\s).)/g);return _?y.concat(_.map(function(A){var P,R;return(R=(P=A.match(/[\t ]/g))===null||P===void 0?void 0:P.length)!==null&&R!==void 0?R:0})):y},[]);if(p.length){var v=new RegExp(`
 [	 ]{`+Math.min.apply(Math,p)+"}","g");d=d.map(function(y){return y.replace(v,`
 `)})}d[0]=d[0].replace(/^\r?\n/,"");var b=d[0];return s.forEach(function(y,T){var _=b.match(/(?:^|\n)( *)$/),A=_?_[1]:"",P=y;typeof y=="string"&&y.includes(`
@@ -2266,31 +2275,38 @@ function renderSteps(steps){return steps.map((s,i)=>{const last=i===steps.length
 
 
 function pmCrumb(cr){return cr.length?'<div class="ac-crumb">'+cr.map(function(x){return '<span>'+esc(x)+'</span>';}).join('<i class="ac-sep">›</i>')+'</div>':'';}
-function pmOutcome(b){var id='d'+(UID++);var det=(b.res&&((b.res.fields&&b.res.fields.length)||b.res.json!=null));
-  var h='<div class="ac-out-h"'+(det?' onclick="document.getElementById(\''+id+'\').classList.toggle(\'open\')"':'')+'>'
-    +'<span class="tag '+esc(b.kind||'neutral')+'">'+esc(b.case)+'</span>'
-    +(b.code&&b.code!=='—'?'<span class="rcode code-'+esc(b.kind||'neutral')+'">'+esc(b.code)+'</span>':'')
-    +(b.res&&b.res.ent?'<span class="ac-ent">'+esc(b.res.ent)+'</span>':'')
-    +(b.desc?'<span class="ac-out-d">'+esc(b.desc)+'</span>':'')
-    +(det?'<span class="chev2">▸</span>':'')+'</div>';
-  var body=det?'<div class="ac-out-b" id="'+id+'">'+((b.res.fields&&b.res.fields.length)?fieldRows(b.res.fields):'')+(b.res.json!=null?'<div class="dh">sample</div><div class="jsonbox">'+jhtml(b.res.json)+'</div>':'')+'</div>':'';
-  return '<div class="ac-out '+esc(b.kind||'neutral')+'">'+h+body+'</div>';}
-function pmCard(it){var r=it.req;var rb='';
-  if(r){var isHttp=['GET','POST','PUT','PATCH','DELETE','WS'].indexOf(r.m)>=0;
-    var hd=(r.h&&r.h.length)?'<div class="hdrs">'+r.h.map(function(x){return '<span>'+esc(x)+'</span>';}).join('')+'</div>':'';
-    rb='<div class="ac-req"><div class="ac-line">'+(isHttp?'<span class="verb '+esc(r.m)+'">'+esc(r.m)+'</span>':'<span class="verb local">local</span>')+'<span class="ac-path">'+esc(r.p)+'</span>'+(r.ent?'<span class="ac-ent">'+esc(r.ent)+'</span>':'')+'</div>'
-      +(r.when?'<div class="ac-when">'+esc(r.when)+'</div>':'')+hd
-      +((r.fields&&r.fields.length)?'<div class="dh">request body</div>'+fieldRows(r.fields):'')
+function pmRespBlock(b){var k=esc(b.kind||'neutral');
+  return '<div class="ac-resp '+k+'"><div class="ac-resp-h"><span class="tag '+k+'">'+esc(b.case)+'</span>'
+    +(b.code&&b.code!=='—'?'<span class="rcode code-'+k+'">'+esc(b.code)+'</span>':'')
+    +(b.res&&b.res.ent?'<span class="ac-ent">'+esc(b.res.ent)+'</span>':'')+'</div>'
+    +(b.desc?'<div class="ac-resp-d">'+esc(b.desc)+'</div>':'')
+    +(b.res&&b.res.fields&&b.res.fields.length?'<div class="dh">fields</div>'+fieldRows(b.res.fields):'')
+    +(b.res&&b.res.json!=null?'<div class="dh">sample</div><div class="jsonbox">'+jhtml(b.res.json)+'</div>':'')+'</div>';}
+function pmBadges(it){var a=[];var arr=(it.outs&&it.outs.length)?it.outs:(it.res?[{kind:'ok',code:it.res.code}]:[]);
+  arr.forEach(function(b){var lbl=(b.code&&b.code!=='—')?b.code:'ok';a.push('<span class="mini code-'+esc(b.kind||'neutral')+'">'+esc(lbl)+'</span>');});
+  return a.join('');}
+function pmCard(it){var r=it.req;
+  var isHttp=r&&['GET','POST','PUT','PATCH','DELETE','WS'].indexOf(r.m)>=0;
+  var verb=r?(isHttp?'<span class="verb '+esc(r.m)+'">'+esc(r.m)+'</span>':'<span class="verb local">local</span>'):'<span class="verb local">step</span>';
+  var head='<div class="ac-head" onclick="this.parentNode.classList.toggle(\'open\')">'
+    +'<div class="ac-hmain">'+verb+'<span class="ac-path">'+esc(r?r.p:it.t)+'</span></div>'
+    +'<div class="ac-hside"><span class="ac-tt">'+esc(it.t)+'</span><span class="ac-badges">'+pmBadges(it)+'</span><span class="chev2">▸</span></div></div>';
+  var reqB='';
+  if(r){var hd=(r.h&&r.h.length)?'<div class="hdrs">'+r.h.map(function(x){return '<span>'+esc(x)+'</span>';}).join('')+'</div>':'';
+    reqB='<div class="ac-sec"><div class="ac-sec-t">Request</div>'
+      +(it.a?'<div class="ac-a2">'+esc(it.a)+'</div>':'')
+      +'<div class="ac-line">'+verb+'<span class="ac-path">'+esc(r.p)+'</span>'+(r.ent?'<span class="ac-ent">'+esc(r.ent)+'</span>':'')+'</div>'
+      +(r.when?'<div class="ac-when">when: '+esc(r.when)+'</div>':'')+hd
+      +((r.fields&&r.fields.length)?'<div class="dh">body</div>'+fieldRows(r.fields):'')
       +(r.json!=null?'<div class="dh">sample request</div><div class="jsonbox">'+jhtml(r.json)+'</div>':'')+'</div>';}
-  var outs='';
-  if(it.outs&&it.outs.length){outs='<div class="dh ac-outs-h">responses</div>'+it.outs.map(pmOutcome).join('');}
-  else if(it.res){outs='<div class="dh ac-outs-h">response</div>'+pmOutcome({case:'returns',kind:'ok',code:it.res.code,res:it.res});}
-  return '<div class="apicall">'+pmCrumb(it.crumb)+'<div class="ac-title">'+esc(it.t)+(it.a?'<span class="ac-a">'+esc(it.a)+'</span>':'')+'</div>'+rb+outs+'</div>';}
+  var arr=(it.outs&&it.outs.length)?it.outs:(it.res?[{case:'returns',kind:'ok',code:it.res.code,res:it.res}]:[]);
+  var respB=arr.length?'<div class="ac-sec"><div class="ac-sec-t">Response'+(arr.length>1?'s':'')+'</div>'+arr.map(pmRespBlock).join('')+'</div>':'';
+  return '<div class="apicall">'+head+'<div class="ac-body">'+pmCrumb(it.crumb)+reqB+respB+'</div></div>';}
 function pmCollect(steps,crumb,acc){(steps||[]).forEach(function(s){
   if(s.req||s.res)acc.push({crumb:crumb.slice(),t:s.t,a:s.a,req:s.req||null,res:s.res||null,outs:s.out||null});
   (s.out||[]).forEach(function(b){if(b.steps&&b.steps.length)pmCollect(b.steps,crumb.concat([b.case]),acc);});
   if(s.steps&&s.steps.length)pmCollect(s.steps,crumb,acc);});}
-function renderApiList(f){var acc=[];pmCollect(f.steps,[],acc);if(!acc.length)return '<div class="ac-empty">No API calls in this flow.</div>';return '<div class="aclist"><div class="ac-hint">Every API call this flow makes, in order. The branching logic is in the Flow diagram.</div>'+acc.map(pmCard).join('')+'</div>';}
+function renderApiList(f){var acc=[];pmCollect(f.steps,[],acc);if(!acc.length)return '<div class="ac-empty">No API calls in this flow.</div>';return '<div class="aclist"><div class="ac-hint">Each row is one API call this flow makes, in order — click a row to open its request &amp; responses. The decision logic is in the Flow diagram.</div>'+acc.map(pmCard).join('')+'</div>';}
 
 /* ---------- FLOWS TAB ---------- */
 document.getElementById('v-flows').innerHTML=
