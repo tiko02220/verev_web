@@ -2,17 +2,16 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, Workflow } from 'lucide-react'
 import { useAdminAuth } from '../auth/AdminAuthContext'
 
+type MapView = { status: 'loading' | 'ready' | 'failed'; src: string | null }
+
 export function ProjectMapPage() {
   const { token } = useAdminAuth()
-  const [src, setSrc] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [view, setView] = useState<MapView>({ status: 'loading', src: null })
 
   useEffect(() => {
     if (!token) return
     let objectUrl: string | null = null
     let cancelled = false
-    setFailed(false)
-    setSrc(null)
     fetch('/project-map.html', { headers: { Authorization: `Bearer ${token}` } })
       .then((response) => {
         if (!response.ok) throw new Error(`status ${response.status}`)
@@ -21,16 +20,18 @@ export function ProjectMapPage() {
       .then((blob) => {
         if (cancelled) return
         objectUrl = URL.createObjectURL(blob)
-        setSrc(objectUrl)
+        setView({ status: 'ready', src: objectUrl })
       })
       .catch(() => {
-        if (!cancelled) setFailed(true)
+        if (!cancelled) setView({ status: 'failed', src: null })
       })
     return () => {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [token])
+
+  const src = view.status === 'ready' ? view.src : null
 
   return (
     <div className="flex h-full flex-col">
@@ -56,7 +57,7 @@ export function ProjectMapPage() {
           Open full screen
         </button>
       </header>
-      {failed ? (
+      {view.status === 'failed' ? (
         <div className="flex flex-1 items-center justify-center px-6 text-sm text-subtle">Couldn’t load the project map. Refresh and try again.</div>
       ) : src ? (
         <iframe title="OneBonus project map" src={src} className="min-h-0 w-full flex-1 border-0 bg-white" />
